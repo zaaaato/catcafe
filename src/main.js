@@ -1,3 +1,4 @@
+import { installBattleSecret, activateBattle } from "./secret-battle.js";
 import "./style.css";
 import {
   createIcons,
@@ -809,3 +810,12 @@ if (import.meta.hot)
     cafe?.dispose();
     audio.destroy();
   });
+
+const disposeBattleSecret = installBattleSecret(
+  document.querySelector(".brand-icon"),
+  {
+    onActivate: () =>
+      activateBattle(window.history, () => window.location.reload()),
+  },
+);
+if (import.meta.hot) import.meta.hot.dispose(disposeBattleSecret);

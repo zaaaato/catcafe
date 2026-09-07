@@ -1,3 +1,4 @@
+import { createBattleEffects } from "./battle-effects.js";
 import { createSocialController } from "./social.js";
 import { animateTail } from "./tail-motion.js";
 import { applyFeedingPose, getFeedingDiagnostics } from "./feeding.js";
@@ -6,7 +7,9 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
 
-export function createCafe(canvas, catsData, callbacks = {}) {
+export function createCafe(canvas, catsData, callbacks = {}, options = {}) {
+  const battleMode = options.battle === true;
+  let battleSnapshot = null;
   let disposed = false,
     frameId = 0,
     reducedMotion = window.matchMedia(
@@ -1061,6 +1064,10 @@ export function createCafe(canvas, catsData, callbacks = {}) {
   heartShape.bezierCurveTo(0.27, 0.02, 0.15, 0.2, 0, 0.03);
   const heartGeo = new THREE.ShapeGeometry(heartShape);
   function pet(i) {
+    if (battleMode) {
+      callbacks.onBattleSelect?.(i);
+      return;
+    }
     const cat = cats[i];
     if (!cat || disposed || cat.pet > 2.4) return;
     cat.pet = 3;
@@ -1737,6 +1744,52 @@ export function createCafe(canvas, catsData, callbacks = {}) {
     clearPath,
     onEvent: (event) => callbacks.onSocial?.(event),
   });
+  const battleEffects = battleMode
+    ? createBattleEffects({ scene, cats, allowed, clearPath })
+    : null;
+  const battleMarkers = battleMode
+    ? [0xe3b55e, 0xcf776b].map((color) => {
+        const marker = new THREE.Mesh(
+          new THREE.RingGeometry(0.44, 0.48, 48),
+          new THREE.MeshBasicMaterial({
+            color,
+            side: THREE.DoubleSide,
+            transparent: true,
+            opacity: 0.85,
+            depthWrite: false,
+          }),
+        );
+        marker.rotation.x = -Math.PI / 2;
+        scene.add(marker);
+        return marker;
+      })
+    : [];
+  function resetBattlePositions() {
+    if (!battleMode) return;
+    cats.forEach((cat, i) => {
+      const angle = (i * Math.PI) / 3;
+      cat.root.position.set(
+        Math.sin(angle) * 1.55,
+        -0.015,
+        0.75 + Math.cos(angle) * 1.25,
+      );
+      cat.root.rotation.set(0, angle + Math.PI, 0);
+      cat.state = "rest";
+      cat.pose = "stand";
+      cat.jump = null;
+      cat.route.length = 0;
+      cat.velocity = 0;
+      cat.pet = 0;
+      cat.feedTime = 0;
+      cat.brushTime = 0;
+      cat.battleAttackTime = 0;
+    });
+  }
+  resetBattlePositions();
+  if (battleMode) {
+    camera.position.set(7.8, 8.6, 10.1);
+    controls.target.set(0, 0.65, 0.75);
+  }
   function animate(now) {
     if (disposed) return;
     frameId = requestAnimationFrame(animate);
@@ -1747,9 +1800,11 @@ export function createCafe(canvas, catsData, callbacks = {}) {
     const motion = reducedMotion ? 0.18 : 1;
     if (mode === "play" && !toyManual && !toyDrag)
       placeToy(Math.sin(time * 0.65) * 1.35, Math.cos(time * 0.9) * 0.75 + 0.6);
-    social.update(dt, { mode, interaction, reducedMotion });
+    if (!battleMode) social.update(dt, { mode, interaction, reducedMotion });
     for (const cat of cats) {
-      const socialAction = social.get(cat);
+      const fighter = battleSnapshot?.fighters?.[cat.index];
+      cat.battleAttackTime = Math.max(0, (cat.battleAttackTime || 0) - dt);
+      const socialAction = battleMode ? null : social.get(cat);
       if (cat.socialActive && !socialAction) {
         cat.state = "rest";
         cat.pose = "sit";
@@ -1766,6 +1821,7 @@ export function createCafe(canvas, catsData, callbacks = {}) {
       cat.pet = Math.max(0, cat.pet - dt);
       const pos = cat.root.position;
       if (
+        !battleMode &&
         !cat.jump &&
         !socialAction &&
         mode === "relax" &&
@@ -1777,7 +1833,12 @@ export function createCafe(canvas, catsData, callbacks = {}) {
         reservePerch(cat);
       const jumping = updateJump(cat, dt);
       const interacting = interaction?.index === cat.index && !jumping;
-      if (jumping) {
+      if (battleMode) {
+        cat.state = "rest";
+        cat.pose = fighter?.hp === 0 ? "sleep" : "stand";
+        cat.timer = 2;
+        cat.target.copy(pos);
+      } else if (jumping) {
       } else if (interacting) {
         cat.state = "rest";
         cat.pose = cat.feedTime > 0 ? "stand" : "sit";
@@ -1874,7 +1935,7 @@ export function createCafe(canvas, catsData, callbacks = {}) {
           wander(cat);
         }
       }
-      const yielding = makeRoomForInteraction(cat);
+      const yielding = battleMode ? null : makeRoomForInteraction(cat);
       cat.routeTimer -= dt;
       const dist = Math.hypot(cat.target.x - pos.x, cat.target.z - pos.z);
       let moving = false;
@@ -2175,6 +2236,15 @@ export function createCafe(canvas, catsData, callbacks = {}) {
             footY = 0.65;
             footZ = 0.52;
           }
+        }
+        if (
+          battleMode &&
+          cat.battleAttackTime > 0 &&
+          j === 1 &&
+          fighter?.hp !== 0
+        ) {
+          footY = 0.46;
+          footZ = 0.65;
         }
         if (
           socialAction?.phase === "pawplay" &&
@@ -2491,6 +2561,17 @@ export function createCafe(canvas, catsData, callbacks = {}) {
     if (focused >= 0 && cats[focused]) {
       const cat = cats[focused],
         target = cat.root.position.clone().add(new THREE.Vector3(0, 0.57, 0));
+      if (
+        battleMode &&
+        cats[battleSnapshot?.attacker] &&
+        cats[battleSnapshot?.target]
+      ) {
+        target
+          .copy(cats[battleSnapshot.attacker].root.position)
+          .add(cats[battleSnapshot.target].root.position)
+          .multiplyScalar(0.5);
+        target.y += 0.57;
+      }
       if (cameraTransition) cameraTransition.target.copy(target);
       const delta = target
         .sub(controls.target)
@@ -2509,6 +2590,17 @@ export function createCafe(canvas, catsData, callbacks = {}) {
       )
         cameraTransition = null;
     }
+    battleEffects?.update(dt, battleSnapshot, { reducedMotion });
+    battleMarkers.forEach((marker, i) => {
+      const index =
+        i === 0
+          ? (battleSnapshot?.attacker ?? 0)
+          : (battleSnapshot?.target ?? 1);
+      const cat = cats[index];
+      marker.visible = Boolean(cat);
+      if (cat)
+        marker.position.set(cat.root.position.x, 0.085, cat.root.position.z);
+    });
     controls.update();
     renderer.render(scene, camera);
   }
@@ -2593,15 +2685,42 @@ export function createCafe(canvas, catsData, callbacks = {}) {
     focused = -1;
     callbacks.onFocus?.(-1);
     cameraTransition = {
-      target: new THREE.Vector3(0, 1, 0),
-      offset: new THREE.Vector3(12.7, 11.1, 15.5),
+      target: battleMode
+        ? new THREE.Vector3(0, 0.65, 0.75)
+        : new THREE.Vector3(0, 1, 0),
+      offset: battleMode
+        ? new THREE.Vector3(7.8, 7.95, 9.35)
+        : new THREE.Vector3(12.7, 11.1, 15.5),
     };
   }
   return {
+    setBattleSnapshot(snapshot) {
+      if (battleMode) battleSnapshot = snapshot;
+    },
+    playBattleEvent(event) {
+      if (!battleMode || disposed) return;
+      if (event.type === "cast" && cats[event.attacker] && cats[event.target]) {
+        const cat = cats[event.attacker],
+          target = cats[event.target].root.position;
+        cat.battleAttackTime = 0.65;
+        cat.root.rotation.y = Math.atan2(
+          target.x - cat.root.position.x,
+          target.z - cat.root.position.z,
+        );
+      }
+      battleEffects.play(event);
+    },
+    resetBattle() {
+      if (!battleMode) return;
+      battleEffects.reset?.();
+      resetBattlePositions();
+      reset();
+    },
     pet(i) {
       if (cats[i]) pet(i);
     },
     setInteraction(kind, index = focused) {
+      if (battleMode) return;
       social.cancel();
       releaseToy();
       if (kind === null) {
@@ -2641,6 +2760,7 @@ export function createCafe(canvas, catsData, callbacks = {}) {
       notifyToy();
     },
     setMode(value) {
+      if (battleMode) return;
       if (!["relax", "play", "treat"].includes(value) || disposed) return;
       social.cancel();
       releaseToy();
@@ -2702,7 +2822,20 @@ export function createCafe(canvas, catsData, callbacks = {}) {
         .clone()
         .add(new THREE.Vector3(0, 0.57, 0));
       const offset = camera.position.clone().sub(controls.target);
-      const distance = THREE.MathUtils.clamp(offset.length(), 4.1, 5.5);
+      const distance =
+        battleMode &&
+        cats[battleSnapshot?.attacker] &&
+        cats[battleSnapshot?.target]
+          ? THREE.MathUtils.clamp(
+              cats[battleSnapshot.attacker].root.position.distanceTo(
+                cats[battleSnapshot.target].root.position,
+              ) *
+                1.1 +
+                4,
+              5.5,
+              10,
+            )
+          : THREE.MathUtils.clamp(offset.length(), 4.1, 5.5);
       offset.y = Math.min(offset.y, Math.hypot(offset.x, offset.z) * 0.72);
       offset.normalize().multiplyScalar(distance);
       cameraTransition = { target, offset };
@@ -2740,6 +2873,7 @@ export function createCafe(canvas, catsData, callbacks = {}) {
     getSnapshot() {
       return {
         mode,
+        battle: battleMode ? battleSnapshot : null,
         social: social.snapshot(),
         focused,
         quality,
@@ -2795,6 +2929,7 @@ export function createCafe(canvas, catsData, callbacks = {}) {
       resizeObserver.disconnect();
       listeners.forEach((remove) => remove());
       controls.removeEventListener("start", stopTransition);
+      battleEffects?.dispose();
       controls.dispose();
       const geometries = new Set(),
         materials = new Set(),

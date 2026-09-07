@@ -65,3 +65,13 @@ A further browser pass checked the hand/brush/food pointer indicator, pointer-do
 - Fixed an exposed dining deadlock: assign bowl seats in current angular order, choosing the shortest rotation, so cats do not exchange places through one another after play.
 - `npm run check`: 32 unit tests and production build passed. Seven social unit cases cover phase progression, actual movement stopping radius, scale-aware nose spacing, exclusions, cancellation, timeouts, unsafe paths and pair rotation.
 - Real WebGL regression: 18 assertions passed. Visually inspected the greeting/paw pair; both cats moved during chase (approximately 0.77 and 1.01 scene units over 1.5 seconds). Direct care immediately cancelled social play. Existing food contact, toy control, tails, jumps and capture remained functional.
+
+## 2026-09-07 — Secret elemental battle arena
+
+- The cafe logo is a hidden entrance: hover for 1.3 seconds to start its shimmer/shake, continue to 4.2 seconds to enter. Touch long-press and keyboard holding also work. Leaving, lifting, moving a touch, hiding the tab, or losing focus cancels. Reduced-motion users receive a static glow.
+- Activation uses a one-shot history-state flag followed by a same-URL reload. The entry consumes the flag before mounting the battle UI; reload/return restores the ordinary cafe. No dedicated battle path or public navigation item is generated.
+- Six elements and 24 named moves: three regular moves and one ultimate per cat. HP, energy, independent cooldowns, burn damage, freezing, paralysis, slow and knockback are isolated from cafe persistence. Down cats recover after five seconds.
+- Battle effects use a capped reusable pool, status particles and safe knockback arcs. Ultimate wind visibly lifts and displaces its target; reset clears effects and positions. Selection rings and pair framing distinguish attacker and target.
+- Unit coverage includes all 24 moves, cooldowns, invalid input, effect timing, energy, knockouts, snapshot isolation, complete reset, one-shot activation and hover/touch cancellation.
+- Real WebGL battle harness: 29 checks passed, including all moves, paralysis, continued burn, lift/push/landing, and reset. Ordinary cafe regression: 18 checks passed with battle state null.
+- Actual browser hover: charging appears, leaving cancels, sustained hover enters at the same URL, and reload exits. Battle UI checked at desktop and 390px widths; ultimate casting updates HP/energy/cooldowns and logs. No JavaScript errors observed.

@@ -7,6 +7,8 @@ for (const name of [
   "feeding.js",
   "tail-motion.js",
   "social.js",
+  "battle-effects.js",
+  "battle-engine.js",
 ]) {
   await copyFile(
     new URL(`../src/${name}`, import.meta.url),
