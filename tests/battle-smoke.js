@@ -43,7 +43,7 @@ export async function runBattleSmoke(harness) {
     "wind ultimate lifts and pushes the target",
     peak.y > 0.2 && peak.z > 2.2,
   );
-  await harness.advance(1);
+  await harness.advance(2.5);
   assert(
     "the knocked-back cat lands",
     Math.abs(harness.snapshot().scene.cats[0].position.y + 0.015) < 0.001,

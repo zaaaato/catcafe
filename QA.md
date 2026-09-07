@@ -96,3 +96,12 @@ Historical manual-mode checks; superseded by the autonomous battle royale below.
 - Real WebGL royale regression: all eight checks passed, including immediate start, autonomous attacks, side collapse, complete rounds, and room bounds. Visually inspected the amplified effects.
 
 - Normal and battle modes now share one cafe shell. The original buttons, profile cards, and inputs remain visible but disabled during battle; canvas and links cannot accept interaction. Desktop and 390px browser checks confirmed all controls disabled, six original cat cards retained, no countdown, no horizontal overflow, and no JavaScript errors. Normal-mode toy controls still work. All 51 unit tests and production build passed.
+
+## 2026-09-07 — Element identities and ultimate cut-ins
+
+- Replaced shared attack stars and rings with six distinct silhouettes and motions: flames, crystals, jagged lightning, spirals, a dark gravity core, and rocks. Normal blending retains their colors instead of washing all attacks out to white. KO stars remain.
+- Ultimate impacts have dedicated compositions: flame columns, an ice-pillar enclosure, overhead lightning, a double tornado, an eclipse with inward-moving particles, and a meteor with radial ground fissures. Fivefold knockback remains.
+- Added portrait/name/element/move-name ultimate cut-ins, matching card badges, and emphasized ultimate log entries. Up to two banners appear at a time; six simultaneous events all display within 3.15 seconds. Reset, hidden tabs, errors, and disposal clear pending banners and timers; reduced motion uses static banners.
+- Real browser presentation checks observed all six queued names exactly once, no banners left afterward, all controls still disabled, and no horizontal overflow at 390px. Visually inspected all six ultimate impacts and desktop/mobile cut-ins. No JavaScript errors observed.
+- Real WebGL move harness: all 29 checks passed, including all 24 moves, burn, paralysis, knockback, landing, and reset. The landing wait accounts for the longer fivefold arc.
+- All 58 unit tests and production build passed. Added four VFX regression cases and three cut-in queue/lifecycle cases. The 100-second autonomous WebGL run passed all eight checks after the final lightning adjustment.

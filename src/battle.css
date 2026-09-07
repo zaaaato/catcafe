@@ -211,3 +211,252 @@
     font-size: 26px;
   }
 }
+
+.cafe-battle .ultimate-cutins {
+  position: absolute;
+  z-index: 4;
+  left: 16px;
+  right: 16px;
+  top: 4%;
+  height: 30%;
+  display: grid;
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+  pointer-events: none;
+}
+.cafe-battle .ultimate-cutin {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 0;
+  padding: 4px 15px 4px 9px;
+  border-left: 7px solid var(--ultimate-color);
+  border-top: 1px solid #fff8;
+  border-bottom: 1px solid #fff8;
+  background: linear-gradient(
+    110deg,
+    #fffdf7 4%,
+    color-mix(in srgb, var(--ultimate-color) 22%, #fffdf1) 76%,
+    var(--ultimate-color)
+  );
+  box-shadow: 0 5px 19px #2c201c38;
+  transform: skewX(-8deg);
+  animation: ultimate-arrive 0.16s ease-out both;
+  isolation: isolate;
+}
+.cafe-battle .ultimate-cutin:before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    -45deg,
+    transparent 0,
+    transparent 12px,
+    #ffffff3d 12px,
+    #ffffff3d 15px
+  );
+  z-index: -1;
+}
+.cafe-battle .ultimate-cutin > span {
+  transform: skewX(8deg);
+}
+.cafe-battle .ultimate-cutin-portrait {
+  height: calc(100% + 15px);
+  width: 94px;
+  flex-shrink: 0;
+  align-self: center;
+  filter: drop-shadow(0 3px 0 #fff) drop-shadow(0 4px 3px #372b2525);
+}
+.cafe-battle .ultimate-cutin-portrait svg {
+  height: 100%;
+  width: 100%;
+  display: block;
+}
+.cafe-battle .ultimate-cutin-copy {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
+}
+.cafe-battle .ultimate-cutin-heading {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  line-height: 1;
+}
+.cafe-battle .ultimate-cutin-heading > b {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  color: #fffdf2;
+  background: #342f29;
+  padding: 4px 9px;
+  transform: skewX(-6deg);
+  white-space: nowrap;
+}
+.cafe-battle .ultimate-cutin-heading > span {
+  font-size: 11px;
+  font-weight: 600;
+  color: #4d4136;
+  white-space: nowrap;
+}
+.cafe-battle .ultimate-cutin-heading > span > span {
+  margin: 0 3px;
+}
+.cafe-battle .ultimate-cutin-copy > strong {
+  font-size: 23px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  line-height: 1.15;
+  color: #342d27;
+  text-shadow: 1px 2px 0 #fff8;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cafe-battle .ultimate-cutin-symbol {
+  font-family: "Noto Serif JP", serif;
+  font-size: 38px;
+  font-weight: 700;
+  line-height: 1;
+  color: #fffdf6;
+  text-shadow: 0 2px 5px #34271840;
+  opacity: 0.92;
+  flex-shrink: 0;
+}
+.cafe-battle .cat-card.battle-ultimate {
+  position: relative;
+  border-color: var(--battle-color);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--battle-color) 35%, transparent);
+  opacity: 1;
+}
+.cafe-battle .ultimate-card-label {
+  position: absolute;
+  right: 10px;
+  top: -7px;
+  padding: 3px 7px;
+  border-radius: 4px;
+  background: #42362c;
+  color: #fff5d8;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  pointer-events: none;
+  box-shadow: 0 1px 4px #43332720;
+}
+.cafe-battle .battle-log-panel li.battle-log-ultimate {
+  color: #694923;
+  background: #ead9b526;
+  padding-left: 6px;
+  border-top-color: #dbc79b;
+}
+.cafe-battle .battle-log-ultimate > span > b {
+  font-size: 8px;
+  background: #79603c;
+  color: #fffbed;
+  border-radius: 3px;
+  padding: 2px 5px;
+  margin-right: 3px;
+  white-space: nowrap;
+}
+.cafe-battle .ultimate-cutins.is-still .ultimate-cutin {
+  animation: none;
+}
+@keyframes ultimate-arrive {
+  from {
+    opacity: 0;
+    translate: 36px 0;
+  }
+  to {
+    opacity: 1;
+    translate: 0 0;
+  }
+}
+@media (max-width: 1150px) {
+  .cafe-battle .ultimate-cutin {
+    gap: 8px;
+    padding-right: 12px;
+  }
+  .cafe-battle .ultimate-cutin-portrait {
+    width: 78px;
+  }
+  .cafe-battle .ultimate-cutin-copy > strong {
+    font-size: 19px;
+  }
+  .cafe-battle .ultimate-cutin-heading > b {
+    font-size: 11px;
+    padding: 4px 7px;
+  }
+  .cafe-battle .ultimate-cutin-heading > span {
+    font-size: 10px;
+  }
+  .cafe-battle .ultimate-cutin-symbol {
+    font-size: 30px;
+  }
+}
+@media (max-width: 540px) {
+  .cafe-battle .ultimate-cutins {
+    left: 11px;
+    right: 11px;
+    top: 4%;
+    height: 31%;
+    gap: 7px;
+  }
+  .cafe-battle .ultimate-cutin {
+    border-left-width: 5px;
+    gap: 6px;
+    padding: 3px 8px 3px 3px;
+  }
+  .cafe-battle .ultimate-cutin-portrait {
+    width: 58px;
+    height: calc(100% + 9px);
+  }
+  .cafe-battle .ultimate-cutin-copy {
+    gap: 5px;
+  }
+  .cafe-battle .ultimate-cutin-heading {
+    gap: 5px;
+  }
+  .cafe-battle .ultimate-cutin-heading > b {
+    font-size: 9px;
+    letter-spacing: 1px;
+    padding: 3px 5px;
+  }
+  .cafe-battle .ultimate-cutin-heading > span {
+    font-size: 8px;
+  }
+  .cafe-battle .ultimate-cutin-copy > strong {
+    font-size: 14px;
+    letter-spacing: 0;
+  }
+  .cafe-battle .ultimate-cutin-symbol {
+    font-size: 21px;
+  }
+  .cafe-battle .ultimate-card-label {
+    font-size: 7px;
+    right: 7px;
+    padding: 3px 5px;
+  }
+}
+@media (max-width: 360px) {
+  .cafe-battle .ultimate-cutin-portrait {
+    width: 48px;
+  }
+  .cafe-battle .ultimate-cutin-copy > strong {
+    font-size: 12px;
+  }
+  .cafe-battle .ultimate-cutin-symbol {
+    font-size: 17px;
+  }
+  .cafe-battle .ultimate-cutin-heading > span {
+    font-size: 7px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cafe-battle .ultimate-cutin {
+    animation: none !important;
+  }
+}

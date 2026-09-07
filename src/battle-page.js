@@ -1,6 +1,7 @@
 import "./style.css";
 import "./battle.css";
 import { cats } from "./cats.js";
+import { createUltimateCutins } from "./ultimate-cutin.js";
 import { renderCafeShell, icon, refreshCafeIcons } from "./cafe-shell.js";
 import { getState, getBondLabel } from "./state.js";
 
@@ -35,6 +36,7 @@ export function mountBattlePage({
   const lastMoves = new Map();
   const combatLog = [];
   let scene;
+  let cutins;
   let engine;
   let ready = false;
   let disposed = false;
@@ -99,8 +101,14 @@ export function mountBattlePage({
     $("#day-btn").setAttribute("aria-pressed", "true");
   }
   refreshCafeIcons();
+  cutins = createUltimateCutins({
+    container: $("#scene-wrap"),
+    catalog: BATTLE_CATS,
+    reducedMotion: initial.settings.reducedMotion,
+  });
 
   function setUnavailable(message) {
+    cutins?.clear();
     ready = false;
     $("#scene-status").hidden = false;
     $("#scene-status").classList.add("has-error");
@@ -112,13 +120,13 @@ export function mountBattlePage({
       ? combatLog
           .map(
             (item) =>
-              `<li><span>${escapeHtml(item.message)}</span>${item.detail ? `<small>${escapeHtml(item.detail)}</small>` : ""}</li>`,
+              `<li class="${item.ultimate ? "battle-log-ultimate" : ""}"><span>${item.ultimate ? "<b>究極技</b> " : ""}${escapeHtml(item.message)}</span>${item.detail ? `<small>${escapeHtml(item.detail)}</small>` : ""}</li>`,
           )
           .join("")
       : "<li>猫たちを、そっと見守っていてください。</li>";
   }
-  function addLog(message, detail = "") {
-    combatLog.unshift({ message, detail });
+  function addLog(message, detail = "", ultimate = false) {
+    combatLog.unshift({ message, detail, ultimate });
     combatLog.splice(6);
     renderLog();
   }
@@ -179,6 +187,7 @@ export function mountBattlePage({
   function onBattleEvent(event) {
     scene?.playBattleEvent?.(event);
     if (event.type === "reset") {
+      cutins?.clear();
       lastMoves.clear();
       combatLog.length = 0;
       renderLog();
@@ -191,9 +200,11 @@ export function mountBattlePage({
             );
       const moveName = move?.name || event.moveName || "魔法";
       lastMoves.set(event.attacker, moveName);
+      if (move?.ultimate) cutins?.enqueue({ ...event, move });
       addLog(
         `${cats[event.attacker]?.name || "猫"}の「${moveName}」`,
         `${cats[event.target]?.name || "相手"}へ${event.damage > 0 ? ` · ${Math.round(event.damage)}ダメージ` : ""}`,
+        Boolean(move?.ultimate),
       );
     } else if (event.type === "down")
       addLog(`${cats[event.target]?.name || "猫"}は、ひと休み。`);
@@ -218,6 +229,7 @@ export function mountBattlePage({
     disposed = true;
     cancelAnimationFrame(frame);
     events.abort();
+    cutins?.dispose();
     scene?.dispose();
     app.classList.remove("cafe-battle");
   }
@@ -235,6 +247,7 @@ export function mountBattlePage({
     setUnavailable("3D表示が中断されました。ほかのタブを閉じてから、");
   });
   listen(document, "visibilitychange", () => {
+    if (document.hidden) cutins?.clear();
     lastTime = performance.now();
   });
   listen(window, "pagehide", (event) => {
