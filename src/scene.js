@@ -8,7 +8,7 @@ import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
 
 export function createCafe(canvas, catsData, callbacks = {}, options = {}) {
-  const battleMode = options.battle === true;
+  let battleMode = false;
   let battleSnapshot = null;
   let disposed = false,
     frameId = 0,
@@ -48,7 +48,6 @@ export function createCafe(canvas, catsData, callbacks = {}, options = {}) {
   controls.maxPolarAngle = Math.PI * 0.46;
   controls.minPolarAngle = 0.2;
   controls.enablePan = false;
-  if (battleMode) controls.enabled = false;
   const ambient = new THREE.HemisphereLight(0xfff7e6, 0x9b9c7c, 2.15);
   scene.add(ambient);
   const sun = new THREE.DirectionalLight(0xffe8b5, 4);
@@ -1202,7 +1201,7 @@ export function createCafe(canvas, catsData, callbacks = {}, options = {}) {
   });
   listen(canvas, "pointermove", (event) => {
     if (battleMode) {
-      canvas.style.cursor = "default";
+      canvas.style.cursor = event.buttons ? "grabbing" : "grab";
       return;
     }
     if (down && Math.hypot(event.clientX - down.x, event.clientY - down.y) > 6)
@@ -1748,30 +1747,35 @@ export function createCafe(canvas, catsData, callbacks = {}, options = {}) {
     clearPath,
     onEvent: (event) => callbacks.onSocial?.(event),
   });
-  const battleEffects = battleMode
-    ? createBattleEffects({ scene, cats, allowed, clearPath })
-    : null;
-  const battleMarkers = battleMode
-    ? [0xed8655, 0x8acddd, 0xa899d6, 0x8acbaa, 0xdfc55e, 0xbd9d70].map(
-        (color) => {
-          const marker = new THREE.Mesh(
-            new THREE.RingGeometry(0.44, 0.48, 48),
-            new THREE.MeshBasicMaterial({
-              color,
-              side: THREE.DoubleSide,
-              transparent: true,
-              opacity: 0.85,
-              depthWrite: false,
-            }),
-          );
-          marker.rotation.x = -Math.PI / 2;
-          scene.add(marker);
-          return marker;
-        },
-      )
-    : [];
+  let battleEffects = null;
+  let battleMarkers = [];
+  function initializeBattleEffects() {
+    if (battleEffects) return;
+    battleEffects = createBattleEffects({ scene, cats, allowed, clearPath });
+    battleMarkers = [0xed8655, 0x8acddd, 0xa899d6, 0x8acbaa, 0xdfc55e, 0xbd9d70].map(
+      (color) => {
+        const marker = new THREE.Mesh(
+          new THREE.RingGeometry(0.44, 0.48, 48),
+          new THREE.MeshBasicMaterial({
+            color,
+            side: THREE.DoubleSide,
+            transparent: true,
+            opacity: 0.85,
+            depthWrite: false,
+          }),
+        );
+        marker.rotation.x = -Math.PI / 2;
+        marker.visible = false;
+        scene.add(marker);
+        return marker;
+      },
+    );
+  }
   function resetBattlePositions() {
     if (!battleMode) return;
+    perches.forEach((spot) => {
+      spot.owner = -1;
+    });
     cats.forEach((cat, i) => {
       const angle = (i * Math.PI) / 3;
       cat.root.position.set(
@@ -1788,14 +1792,48 @@ export function createCafe(canvas, catsData, callbacks = {}, options = {}) {
       cat.pet = 0;
       cat.feedTime = 0;
       cat.brushTime = 0;
+      cat.snack.visible = false;
+      cat.socialActive = false;
+      cat.routeTimer = 0;
+      cat.target.copy(cat.root.position);
       cat.battleAttackTime = 0;
       cat.battleDownTime = 0;
     });
   }
-  resetBattlePositions();
-  if (battleMode) {
+  // Transfer ownership without replacing the WebGL canvas or the user's view.
+  function enterBattle() {
+    if (disposed || battleMode) return;
+    callbacks = {};
+    releaseToy();
+    social.cancel();
+    interaction = null;
+    down = null;
+    focused = -1;
+    cameraTransition = null;
+    mode = "relax";
+    toyManual = false;
+    toy.visible = false;
+    treats.visible = false;
+    for (const heart of hearts) {
+      scene.remove(heart.mesh);
+      heart.mesh.material.dispose();
+    }
+    hearts.length = 0;
+    for (const mote of furMotes) scene.remove(mote.mesh);
+    furMotes.length = 0;
+    battleMode = true;
+    battleSnapshot = null;
+    initializeBattleEffects();
+    resetBattlePositions();
+    controls.enabled = true;
+    controls.enableRotate = true;
+    controls.enableZoom = true;
+    canvas.style.cursor = "grab";
+  }
+  if (options.battle === true) {
     camera.position.set(9.4, 10.6, 12.2);
     controls.target.set(0, 1.8, 0.75);
+    enterBattle();
   }
   function animate(now) {
     if (disposed) return;
@@ -2731,6 +2769,7 @@ export function createCafe(canvas, catsData, callbacks = {}, options = {}) {
     };
   }
   return {
+    enterBattle,
     getBattlePositions() {
       return cats.map((cat) => ({
         x: cat.root.position.x,
@@ -2761,8 +2800,8 @@ export function createCafe(canvas, catsData, callbacks = {}, options = {}) {
     resetBattle() {
       if (!battleMode) return;
       battleEffects.reset?.();
+      battleSnapshot = null;
       resetBattlePositions();
-      reset();
     },
     pet(i) {
       if (cats[i]) pet(i);
@@ -2922,6 +2961,17 @@ export function createCafe(canvas, catsData, callbacks = {}, options = {}) {
     getSnapshot() {
       return {
         mode,
+        battleMode,
+        camera: {
+          position: camera.position.toArray(),
+          target: controls.target.toArray(),
+          distance: camera.position.distanceTo(controls.target),
+          controls: {
+            enabled: controls.enabled,
+            enableRotate: controls.enableRotate,
+            enableZoom: controls.enableZoom,
+          },
+        },
         battle: battleMode ? battleSnapshot : null,
         social: social.snapshot(),
         focused,

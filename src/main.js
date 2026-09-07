@@ -1,5 +1,5 @@
 import { renderCafeShell, icon, face, refreshCafeIcons } from "./cafe-shell.js";
-import { installBattleSecret, activateBattle } from "./secret-battle.js";
+import { installBattleSecret } from "./secret-battle.js";
 import "./style.css";
 
 import { cats, favorites, stories } from "./cats.js";
@@ -16,6 +16,14 @@ import {
   isPersistent,
 } from "./state.js";
 const $ = (selector) => document.querySelector(selector);
+const cafeEvents = new AbortController();
+let cafeHandedOff = false;
+let battlePage;
+const listen = (target, type, handler, options = {}) =>
+  target.addEventListener(type, handler, {
+    ...options,
+    signal: cafeEvents.signal,
+  });
 const refreshIcons = refreshCafeIcons;
 const initial = getState();
 document.querySelector("#app").innerHTML = renderCafeShell();
@@ -62,11 +70,11 @@ function openDialog(id) {
   if (!dialog.open) dialog.showModal();
 }
 for (const button of document.querySelectorAll("[data-close]"))
-  button.addEventListener("click", () =>
+  listen(button, "click", () =>
     document.getElementById(button.dataset.close).close(),
   );
 for (const dialog of document.querySelectorAll("dialog"))
-  dialog.addEventListener("click", (event) => {
+  listen(dialog, "click", (event) => {
     if (event.target !== dialog) return;
     const rect = dialog.getBoundingClientRect();
     if (
@@ -222,10 +230,11 @@ function moveInteractionCursor(event) {
   cursor.classList.toggle("is-touch", event.pointerType === "touch");
   cursor.classList.toggle("is-touching", event.buttons > 0);
 }
-$("#cafe").addEventListener("pointermove", moveInteractionCursor, {
+listen($("#cafe"), "pointermove", moveInteractionCursor, {
   passive: true,
 });
-$("#cafe").addEventListener(
+listen(
+  $("#cafe"),
   "pointerdown",
   (event) => {
     activeCafePointers.add(event.pointerId);
@@ -236,7 +245,8 @@ $("#cafe").addEventListener(
   { passive: true },
 );
 for (const type of ["pointerup", "pointercancel"])
-  $("#cafe").addEventListener(
+  listen(
+    $("#cafe"),
     type,
     (event) => {
       activeCafePointers.delete(event.pointerId);
@@ -246,7 +256,8 @@ for (const type of ["pointerup", "pointercancel"])
     },
     { passive: true },
   );
-$("#cafe").addEventListener(
+listen(
+  $("#cafe"),
   "pointerleave",
   () => {
     activeCafePointers.clear();
@@ -278,7 +289,7 @@ function showSceneError(message) {
   const reload = document.createElement("button");
   reload.className = "primary-button";
   reload.textContent = "もう一度ひらく";
-  reload.addEventListener("click", () => location.reload());
+  listen(reload, "click", () => location.reload());
   status.append(title, detail, reload);
   $("#welcome-tip").hidden = true;
 }
@@ -350,6 +361,7 @@ async function enableSound(enabled) {
   $("#audio-enabled").disabled = true;
   try {
     soundOn = await audio.setEnabled(enabled);
+    if (cafeHandedOff) return;
     updateSettings({ soundEnabled: soundOn });
     renderSound();
     toast(
@@ -360,12 +372,14 @@ async function enableSound(enabled) {
           : "環境音をオフにしました。",
     );
   } catch (error) {
+    if (cafeHandedOff) return;
     console.warn("Audio could not be started:", error);
     soundOn = false;
     renderSound();
     toast("音声を再生できませんでした。もう一度お試しください。");
   } finally {
     audioBusy = false;
+    if (cafeHandedOff) return;
     $("#sound-btn").disabled = false;
     $("#audio-enabled").disabled = false;
     if (
@@ -469,32 +483,28 @@ requestAnimationFrame(() =>
     }
   }, 0),
 );
-$("#cafe").addEventListener("webglcontextlost", (event) => {
+listen($("#cafe"), "webglcontextlost", (event) => {
   event.preventDefault();
   showSceneError(
     "3D表示が中断されました。ほかのタブを閉じてから、もう一度お試しください。",
   );
 });
-$("#pet-btn").addEventListener("click", () => cafe?.pet(selectedCat));
-$("#interact-btn").addEventListener("click", () => beginInteraction());
-$("#end-interaction").addEventListener("click", () => endInteraction());
-$("#perform-interaction").addEventListener("click", () =>
-  cafe?.performInteraction(),
-);
+listen($("#pet-btn"), "click", () => cafe?.pet(selectedCat));
+listen($("#interact-btn"), "click", () => beginInteraction());
+listen($("#end-interaction"), "click", () => endInteraction());
+listen($("#perform-interaction"), "click", () => cafe?.performInteraction());
 for (const button of document.querySelectorAll("[data-interaction]"))
-  button.addEventListener("click", () =>
+  listen(button, "click", () =>
     beginInteraction(button.dataset.interaction, false),
   );
 for (const element of document.querySelectorAll(".cat-card"))
-  element.addEventListener("click", () =>
-    selectCat(Number(element.dataset.cat)),
-  );
+  listen(element, "click", () => selectCat(Number(element.dataset.cat)));
 for (const [id, mode, effect, message] of [
   ["toy-btn", "play", "toy", "ボールをつかんで、猫たちと遊んでみよう。"],
   ["treat-btn", "treat", "treat", "おやつの時間。猫たちが集まってきます。"],
   ["relax-btn", "relax", null, "のんびり、猫たちのペースで。"],
 ])
-  document.getElementById(id).addEventListener("click", () => {
+  listen(document.getElementById(id), "click", () => {
     if (!sceneReady) return;
     if (interactionKind) endInteraction(false);
     currentMode = mode;
@@ -509,28 +519,28 @@ for (const [id, mode, effect, message] of [
     if (effect) audio.playEffect(effect);
     toast(message);
   });
-$("#zoom-in").addEventListener("click", () => cafe?.zoom(1.15));
-$("#zoom-out").addEventListener("click", () => cafe?.zoom(1 / 1.15));
-$("#reset-view").addEventListener("click", () => {
+listen($("#zoom-in"), "click", () => cafe?.zoom(1.15));
+listen($("#zoom-out"), "click", () => cafe?.zoom(1 / 1.15));
+listen($("#reset-view"), "click", () => {
   if (interactionKind) endInteraction(false);
   cafe?.reset();
   toast("カフェ全体を見渡す、いつもの席へ。");
 });
-$("#day-btn").addEventListener("click", () => {
+listen($("#day-btn"), "click", () => {
   evening = !evening;
   cafe?.setEvening(evening);
   updateSettings({ evening });
   renderDay();
 });
-$("#photo-btn").addEventListener("click", takePhoto);
-$("#retake-photo").addEventListener("click", () => {
+listen($("#photo-btn"), "click", takePhoto);
+listen($("#retake-photo"), "click", () => {
   $("#photo-dialog").close();
   toast("好きな角度に合わせて、もう一度カメラボタンを。");
 });
-$("#download-photo").addEventListener("click", () => {
+listen($("#download-photo"), "click", () => {
   if (photoUrl) toast("写真をダウンロードします。またいつでも、会いにきてね。");
 });
-$("#fullscreen").addEventListener("click", async () => {
+listen($("#fullscreen"), "click", async () => {
   try {
     if (document.fullscreenElement) await document.exitFullscreen();
     else await $("#scene-wrap").requestFullscreen();
@@ -538,7 +548,7 @@ $("#fullscreen").addEventListener("click", async () => {
     toast("このブラウザでは全画面表示を利用できません。");
   }
 });
-document.addEventListener("fullscreenchange", () => {
+listen(document, "fullscreenchange", () => {
   if (document.fullscreenElement && currentMode === "play" && !interactionKind)
     $("#cafe").focus({ preventScroll: true });
   $("#fullscreen").setAttribute(
@@ -550,49 +560,49 @@ document.addEventListener("fullscreenchange", () => {
     String(Boolean(document.fullscreenElement)),
   );
 });
-$("#observation-btn").addEventListener("click", () => {
+listen($("#observation-btn"), "click", () => {
   renderObservations();
   openDialog("observation-dialog");
 });
-$("#about-btn").addEventListener("click", () => openDialog("about"));
-$("#footer-about").addEventListener("click", () => openDialog("about"));
-$("#help-btn").addEventListener("click", () => openDialog("help-dialog"));
-$("#welcome-help").addEventListener("click", () => {
+listen($("#about-btn"), "click", () => openDialog("about"));
+listen($("#footer-about"), "click", () => openDialog("about"));
+listen($("#help-btn"), "click", () => openDialog("help-dialog"));
+listen($("#welcome-help"), "click", () => {
   dismissWelcome();
   openDialog("help-dialog");
 });
-$("#dismiss-welcome").addEventListener("click", dismissWelcome);
-$("#settings-btn").addEventListener("click", () => {
+listen($("#dismiss-welcome"), "click", dismissWelcome);
+listen($("#settings-btn"), "click", () => {
   renderSettings();
   openDialog("settings-dialog");
 });
-$("#sound-btn").addEventListener("click", () => enableSound(!soundOn));
-$("#audio-enabled").addEventListener("change", (event) =>
+listen($("#sound-btn"), "click", () => enableSound(!soundOn));
+listen($("#audio-enabled"), "change", (event) =>
   enableSound(event.target.checked),
 );
-$("#ambience").addEventListener("change", (event) => {
+listen($("#ambience"), "change", (event) => {
   audio.setPreset(event.target.value);
   updateSettings({ ambience: event.target.value });
 });
-$("#volume").addEventListener("input", (event) => {
+listen($("#volume"), "input", (event) => {
   const volume = Number(event.target.value) / 100;
   audio.setVolume(volume);
   $("#volume-output").value = `${Math.round(volume * 100)}%`;
 });
-$("#volume").addEventListener("change", (event) =>
+listen($("#volume"), "change", (event) =>
   updateSettings({ volume: Number(event.target.value) / 100 }),
 );
-$("#reduced-motion").addEventListener("change", (event) => {
+listen($("#reduced-motion"), "change", (event) => {
   const reducedMotion = event.target.checked;
   updateSettings({ reducedMotion });
   cafe?.setReducedMotion(reducedMotion);
   document.documentElement.classList.toggle("reduce-motion", reducedMotion);
 });
-$("#quality").addEventListener("change", (event) => {
+listen($("#quality"), "change", (event) => {
   updateSettings({ quality: event.target.value });
   cafe?.setQuality(event.target.value);
 });
-$("#profile-btn").addEventListener("click", () => {
+listen($("#profile-btn"), "click", () => {
   const cat = cats[selectedCat];
   const bond = getState().bonds[selectedCat] || 0;
   $("#profile-content").innerHTML =
@@ -600,7 +610,7 @@ $("#profile-btn").addEventListener("click", () => {
   refreshIcons();
   openDialog("profile-dialog");
 });
-$("#profile-pet").addEventListener("click", () => {
+listen($("#profile-pet"), "click", () => {
   $("#profile-dialog").close();
   cafe?.focus(selectedCat);
   cafe?.pet(selectedCat);
@@ -650,10 +660,10 @@ const sessionTimer = setInterval(() => {
   $("#session-time").textContent =
     `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 }, 1000);
-document.addEventListener("visibilitychange", () => {
+listen(document, "visibilitychange", () => {
   sessionLastTick = performance.now();
 });
-document.addEventListener("keydown", (event) => {
+listen(document, "keydown", (event) => {
   if (
     event.defaultPrevented ||
     event.ctrlKey ||
@@ -719,20 +729,57 @@ document.addEventListener("keydown", (event) => {
     cafe.zoom(1 / 1.15);
   }
 });
+function releaseCafeUI() {
+  cafeHandedOff = true;
+  cafeEvents.abort();
+  clearInterval(sessionTimer);
+  clearTimeout(toast.timeout);
+  unsubscribe?.();
+  disposeBattleSecret?.();
+  hideInteractionCursor();
+  activeCafePointers.clear();
+  $("#toast").classList.remove("show");
+  document.querySelectorAll("dialog[open]").forEach((dialog) => dialog.close());
+  soundOn = false;
+  renderSound();
+  audio.destroy();
+}
+
+async function startSecretBattle() {
+  if (cafeHandedOff || !sceneReady || !cafe) return;
+  try {
+    // Keep rendering the current room while the secret UI chunk is fetched.
+    const [{ mountBattlePage }, { BATTLE_CATS, createBattleEngine }] =
+      await Promise.all([
+        import("./battle-page.js"),
+        import("./battle-engine.js"),
+      ]);
+    if (cafeHandedOff) return;
+    releaseCafeUI();
+    battlePage = mountBattlePage({
+      createCafe,
+      BATTLE_CATS,
+      createBattleEngine,
+      existingScene: cafe,
+      preserveShell: true,
+    });
+  } catch (error) {
+    console.error("Secret battle could not start:", error);
+    if (!cafeHandedOff) {
+      toast("まだ、力が目覚めないようです。もう一度、見つめてみて。");
+      disposeBattleSecret();
+      disposeBattleSecret = installBattleSecret($(".brand-icon"), {
+        onActivate: startSecretBattle,
+      });
+    }
+  }
+}
+let disposeBattleSecret = installBattleSecret($(".brand-icon"), {
+  onActivate: startSecretBattle,
+});
 if (import.meta.hot)
   import.meta.hot.dispose(() => {
-    clearInterval(sessionTimer);
-    clearTimeout(toast.timeout);
-    unsubscribe?.();
-    cafe?.dispose();
-    audio.destroy();
+    releaseCafeUI();
+    if (battlePage) battlePage.dispose();
+    else cafe?.dispose();
   });
-
-const disposeBattleSecret = installBattleSecret(
-  document.querySelector(".brand-icon"),
-  {
-    onActivate: () =>
-      activateBattle(window.history, () => window.location.reload()),
-  },
-);
-if (import.meta.hot) import.meta.hot.dispose(disposeBattleSecret);

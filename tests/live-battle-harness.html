@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="ja">
+  <meta charset="utf-8" />
+  <title>Live cafe to battle handover integration harness</title>
+  <style>
+    body {
+      margin: 0;
+      background: #e9e5d9;
+      font:
+        14px system-ui,
+        sans-serif;
+    }
+    canvas {
+      display: block;
+      width: 900px;
+      height: 600px;
+      touch-action: none;
+    }
+    #status {
+      margin: 12px 18px;
+    }
+  </style>
+  <canvas id="cafe" aria-label="Live handover test canvas"></canvas>
+  <p id="status" role="status">Preparing deterministic scene…</p>
+  <script type="module" src="./live-battle-harness.js"></script>
+</html>

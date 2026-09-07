@@ -12,10 +12,10 @@
   pointer-events: none;
 }
 .cafe-battle #cafe {
-  cursor: default;
+  cursor: grab;
 }
 .cafe-battle .scene-help {
-  opacity: 0.48;
+  opacity: 1;
 }
 .cafe-battle .cat-text {
   min-width: 0;

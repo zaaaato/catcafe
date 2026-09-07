@@ -3,10 +3,11 @@ import { createCafe } from "./.snapshot/scene.js";
 import { BATTLE_CATS, createBattleEngine } from "./.snapshot/battle-engine.js";
 
 let engine;
+let cafe;
 let present;
 const events = [];
 const page = mountBattlePage({
-  createCafe,
+  createCafe: (...args) => (cafe = createCafe(...args)),
   BATTLE_CATS,
   createBattleEngine(options) {
     present = options.onEvent;
@@ -44,6 +45,10 @@ window.ultimateHarness = {
     });
   },
   reset: () => engine.reset(),
-  snapshot: () => ({ engine: engine.snapshot(), events }),
+  snapshot: () => ({
+    engine: engine.snapshot(),
+    scene: cafe?.getSnapshot(),
+    events,
+  }),
   dispose: () => page.dispose(),
 };

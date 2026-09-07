@@ -105,3 +105,12 @@ Historical manual-mode checks; superseded by the autonomous battle royale below.
 - Real browser presentation checks observed all six queued names exactly once, no banners left afterward, all controls still disabled, and no horizontal overflow at 390px. Visually inspected all six ultimate impacts and desktop/mobile cut-ins. No JavaScript errors observed.
 - Real WebGL move harness: all 29 checks passed, including all 24 moves, burn, paralysis, knockback, landing, and reset. The landing wait accounts for the longer fivefold arc.
 - All 58 unit tests and production build passed. Added four VFX regression cases and three cut-in queue/lifecycle cases. The 100-second autonomous WebGL run passed all eight checks after the final lightning adjustment.
+
+## 2026-09-07 — Live transition and spectator camera controls
+
+- Secret activation loads its UI while the cafe keeps rendering, then transfers the existing scene and DOM into battle. No document reload, canvas replacement, whiteout, or loading overlay occurs. Old cafe UI listeners, timers, subscriptions, and audio are released before battle attaches its handlers.
+- Added an idempotent scene handover that clears play, feeding, interaction, social behavior, and jumps while retaining the renderer, canvas, WebGL context, camera position, and target. Automatic round resets preserve the visitor's camera.
+- Restored orbit dragging, zoom, view reset, fullscreen, photo capture, and day/evening controls in battle. Cat interaction buttons remain disabled. Keyboard +/-/R/F/C and photo dialog controls work alongside the scene buttons.
+- Actual browser hover confirmed identical canvas, WebGL context, and performance time origin before/after activation, with no loading overlay. Browser actions confirmed exact 1.15 zoom, changed camera position after dragging, fullscreen entry/exit, and PNG photo preview. Reload returns to ordinary cafe controls; toy mode still works.
+- Live WebGL handover harness: all 20 assertions passed through 100 simulated seconds and round four, including handover during care, camera preservation, released old interactions, idempotence, all six autonomous fighters, winners, context reuse, and finite room bounds.
+- `npm run check`: all 58 unit tests and production build passed.
