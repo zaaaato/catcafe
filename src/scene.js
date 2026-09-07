@@ -1794,8 +1794,8 @@ export function createCafe(canvas, catsData, callbacks = {}, options = {}) {
   }
   resetBattlePositions();
   if (battleMode) {
-    camera.position.set(7.8, 8.6, 10.1);
-    controls.target.set(0, 0.65, 0.75);
+    camera.position.set(9.4, 10.6, 12.2);
+    controls.target.set(0, 1.8, 0.75);
   }
   function animate(now) {
     if (disposed) return;
@@ -2723,10 +2723,10 @@ export function createCafe(canvas, catsData, callbacks = {}, options = {}) {
     callbacks.onFocus?.(-1);
     cameraTransition = {
       target: battleMode
-        ? new THREE.Vector3(0, 0.65, 0.75)
+        ? new THREE.Vector3(0, 1.8, 0.75)
         : new THREE.Vector3(0, 1, 0),
       offset: battleMode
-        ? new THREE.Vector3(7.8, 7.95, 9.35)
+        ? new THREE.Vector3(9.4, 8.8, 11.45)
         : new THREE.Vector3(12.7, 11.1, 15.5),
     };
   }

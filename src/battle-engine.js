@@ -294,9 +294,9 @@ export function createBattleEngine({
     casts = 0,
     eventId = 0,
     round = 1;
-  let phase = autonomous ? "countdown" : "fighting";
-  let countdown = autonomous ? 3 : 0,
-    winner = null,
+  let phase = "fighting";
+  let roundStartPending = autonomous;
+  let winner = null,
     nextRoundIn = 0;
   let positions = BATTLE_CATS.map((cat) => formation(cat.index));
   const newFighter = (index) => ({
@@ -357,13 +357,14 @@ export function createBattleEngine({
     }
     round = number;
     casts = 0;
-    phase = autonomous ? "countdown" : "fighting";
-    countdown = autonomous ? 3 : 0;
+    phase = "fighting";
+    roundStartPending = false;
     nextRoundIn = 0;
     winner = null;
     positions = BATTLE_CATS.map((cat) => formation(cat.index));
     fighters = BATTLE_CATS.map((cat) => newFighter(cat.index));
     emit({ type: "reset" });
+    if (autonomous) emit({ type: "round-start" });
   }
   function advanceFighter(fighter, dt) {
     if (fighter.eliminated) return;
@@ -585,7 +586,6 @@ export function createBattleEngine({
       casts,
       phase,
       round,
-      countdown,
       winner,
       nextRoundIn,
       fighters: fighters.map((fighter) => ({
@@ -618,6 +618,10 @@ export function createBattleEngine({
         !Number.isFinite(time + dt)
       )
         return false;
+      if (roundStartPending) {
+        roundStartPending = false;
+        emit({ type: "round-start" });
+      }
       const external = Array.isArray(suppliedPositions);
       if (external)
         suppliedPositions.forEach((position, index) => {
@@ -645,20 +649,9 @@ export function createBattleEngine({
         const step = Math.min(
           remaining,
           0.05,
-          phase === "countdown"
-            ? Math.max(countdown, 1e-9)
-            : phase === "finished"
-              ? Math.max(nextRoundIn, 1e-9)
-              : 0.05,
+          phase === "finished" ? Math.max(nextRoundIn, 1e-9) : 0.05,
         );
-        if (phase === "countdown") {
-          countdown = Math.max(0, countdown - step);
-          if (countdown < 1e-8) {
-            countdown = 0;
-            phase = "fighting";
-            emit({ type: "round-start", time: time + step });
-          }
-        } else if (phase === "finished") {
+        if (phase === "finished") {
           nextRoundIn = Math.max(0, nextRoundIn - step);
           if (nextRoundIn < 1e-8) startRound(round + 1);
         } else {

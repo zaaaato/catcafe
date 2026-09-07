@@ -235,14 +235,14 @@ function runToWinner(engine, maximumSeconds = 90) {
   assert.fail("Autonomous battle did not reach a winner");
 }
 
-test("spectator mode starts with a real countdown and no input is needed for all six cats to fight", () => {
+test("spectator mode starts fighting immediately and all six cats move on the first frame", () => {
   const events = [];
   const engine = createBattleEngine({
     random: seeded(1),
     onEvent: (event) => events.push(event),
   });
-  assert.equal(engine.snapshot().phase, "countdown");
-  assert.equal(engine.snapshot().countdown, 3);
+  assert.equal(engine.snapshot().phase, "fighting");
+  assert.equal("countdown" in engine.snapshot(), false);
   assert(
     engine
       .snapshot()
@@ -250,12 +250,13 @@ test("spectator mode starts with a real countdown and no input is needed for all
         (f) => f.energy === 35 && f.target === null && f.speed === 0,
       ),
   );
-  assert.equal(engine.cast(0, 1, 0).code, "not-fighting");
-  engine.update(2.9);
-  assert.equal(engine.snapshot().casts, 0);
-  assert.equal(engine.snapshot().phase, "countdown");
-  engine.update(0.1);
+  engine.update(0.05);
   assert.equal(engine.snapshot().phase, "fighting");
+  assert(engine.snapshot().fighters.every((f) => f.moveTarget && f.speed > 0));
+  assert.equal(
+    events.filter((event) => event.type === "round-start").length,
+    1,
+  );
   const result = runToWinner(engine);
   const attacks = events.filter((event) => event.type === "cast");
   assert.equal(new Set(attacks.map((event) => event.attacker)).size, 6);
@@ -291,7 +292,7 @@ test("twelve deterministic autonomous matches all reach a winner and never resto
   }
 });
 
-test("the winner remains for eight seconds before a reset event starts the next round countdown", () => {
+test("the winner remains for eight seconds before the next round starts fighting immediately", () => {
   const events = [];
   const engine = createBattleEngine({
     random: seeded(7),
@@ -306,7 +307,13 @@ test("the winner remains for eight seconds before a reset event starts the next 
   engine.update(0.2);
   const next = engine.snapshot();
   assert.equal(next.round, 2);
-  assert.equal(next.phase, "countdown");
+  assert.equal(next.phase, "fighting");
+  assert.equal("countdown" in next, false);
+  assert.equal(
+    events.filter((event) => event.type === "round-start" && event.round === 2)
+      .length,
+    1,
+  );
   assert.equal(next.winner, null);
   assert(
     next.fighters.every(
@@ -323,7 +330,7 @@ test("the winner remains for eight seconds before a reset event starts the next 
 test("external scene positions are respected and frozen cats receive no movement intent", () => {
   const engine = createBattleEngine({ random: seeded(5) });
   const original = engine.snapshot().fighters.map((f) => ({ ...f.position }));
-  engine.update(3, original);
+  engine.update(0, original);
   assert(engine.cast(1, 0, 2).ok);
   engine.update(0.05, original);
   const frozen = fighter(engine, 0);

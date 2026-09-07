@@ -87,3 +87,12 @@ Historical manual-mode checks; superseded by the autonomous battle royale below.
 - Real WebGL royale harness: all seven checks passed across 100 simulated seconds, reaching round four. Covered six autonomous attackers, ordinary/ultimate moves, movement, sideways collapse, last-survivor finish, automatic restart, and finite positions within the room.
 - Ordinary cafe WebGL regression: all 18 assertions passed, including feeding contact, toys, elevated rests, social play, tails, and disposal.
 - Actual desktop browser: sustained logo hover enters on the same URL, normal headline remains, no command buttons exist, and HP/logs update without input. Visually inspected the spectator screen and sideways fallen cats; no JavaScript errors observed.
+
+## 2026-09-07 — Fivefold spectacle and immediate start
+
+- Removed the countdown from initial entry and subsequent rounds. The first update immediately produces autonomous movement intents; winner intermissions remain eight seconds.
+- Multiplied projectile, star, and ring sizes and particle scattering speeds by five. Normal/ultimate knockback now travels up to 6/9.5 units with arcs of 2.5/5.5 units, subject to obstacle clearance. Increased camera headroom for airborne cats.
+- Kept the particle pool bounded at 140 and preserved reduced-motion settings. Real Three.js checks measured exact unobstructed distances of 6 and 9.5, a fivefold projectile size, wall stopping, and all six projectiles arriving even with a saturated cosmetic pool.
+- Real WebGL royale regression: all eight checks passed, including immediate start, autonomous attacks, side collapse, complete rounds, and room bounds. Visually inspected the amplified effects.
+
+- Normal and battle modes now share one cafe shell. The original buttons, profile cards, and inputs remain visible but disabled during battle; canvas and links cannot accept interaction. Desktop and 390px browser checks confirmed all controls disabled, six original cat cards retained, no countdown, no horizontal overflow, and no JavaScript errors. Normal-mode toy controls still work. All 51 unit tests and production build passed.

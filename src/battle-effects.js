@@ -11,6 +11,7 @@ const COLORS = {
 const UP = new THREE.Vector3(0, 1, 0);
 const CAPACITY = 140;
 const PROJECTILE_RESERVE = 12;
+const SPECTACLE_SCALE = 5;
 const FLOOR = -0.015;
 
 /** Small, pooled fantasy effects. Owns its graphics, never the cats' materials. */
@@ -97,6 +98,9 @@ export function createBattleEffects({
   const indexOf = (value) => (typeof value === "number" ? value : value?.index);
   function acquire(kind, element, size, life) {
     if (disposed) return null;
+    // Make each effect conspicuously larger without multiplying draw calls or
+    // memory. Reduced motion keeps the previous, restrained visual scale.
+    size *= reducedMotion ? 1 : SPECTACLE_SCALE;
     let particle;
     let free = 0;
     for (const candidate of pool) if (!candidate.active) free++;
@@ -190,6 +194,7 @@ export function createBattleEffects({
       gentle ? 0.3 + Math.random() * 0.5 : 0.4 + Math.random() * 1.2,
       (Math.random() - 0.5) * (gentle ? 0.3 : 1.7),
     );
+    if (!reducedMotion) particle.velocity.multiplyScalar(SPECTACLE_SCALE);
     if (element === "ice")
       particle.mesh.scale.set(
         particle.size * 0.6,
@@ -222,6 +227,7 @@ export function createBattleEffects({
       reducedMotion ? 0.35 : 0.8 + Math.random() * 1.2,
       Math.sin(particle.phase) * speed,
     );
+    if (!reducedMotion) particle.velocity.multiplyScalar(SPECTACLE_SCALE);
   }
   function dizzyStars(index) {
     const target = catAt(index);
@@ -265,8 +271,11 @@ export function createBattleEffects({
         reducedMotion ? 0.6 : 2.4 + Math.random() * 2.3,
         Math.sin(particle.phase) * speed,
       );
+      if (!reducedMotion) particle.velocity.multiplyScalar(SPECTACLE_SCALE);
       if (particle.kind === "confetti")
-        particle.mesh.scale.set(0.065, 0.14, 0.025);
+        particle.mesh.scale
+          .set(0.065, 0.14, 0.025)
+          .multiplyScalar(reducedMotion ? 1 : SPECTACLE_SCALE);
     }
     ring(origin, "lightning", reducedMotion ? 0.6 : 1.1, 1.4);
   }
@@ -330,9 +339,9 @@ export function createBattleEffects({
     knocks.set(indexOf(target), {
       direction,
       age: 0,
-      life: ultimate ? 0.85 : 0.62,
-      distance: ultimate ? 1.9 : 1.2,
-      height: ultimate ? 1.1 : 0.5,
+      life: (ultimate ? 0.85 : 0.62) * Math.sqrt(SPECTACLE_SCALE),
+      distance: (ultimate ? 1.9 : 1.2) * SPECTACLE_SCALE,
+      height: (ultimate ? 1.1 : 0.5) * SPECTACLE_SCALE,
     });
   }
   function impact(particle) {
@@ -464,8 +473,10 @@ export function createBattleEffects({
         const angle =
           particle.phase + particle.age * (reducedMotion ? 0.3 : 3.8);
         mesh.position.copy(target.root.position);
-        mesh.position.x += Math.cos(angle) * (reducedMotion ? 0.4 : 0.58);
-        mesh.position.z += Math.sin(angle) * (reducedMotion ? 0.4 : 0.58);
+        mesh.position.x +=
+          Math.cos(angle) * (reducedMotion ? 0.4 : 0.58 * SPECTACLE_SCALE);
+        mesh.position.z +=
+          Math.sin(angle) * (reducedMotion ? 0.4 : 0.58 * SPECTACLE_SCALE);
         mesh.position.y +=
           1.05 + Math.sin(angle * 2) * (reducedMotion ? 0.01 : 0.08);
         mesh.rotation.y = -angle;

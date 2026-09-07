@@ -32,6 +32,7 @@ const engine = createBattleEngine({
   },
 });
 cafe.setBattleSnapshot(engine.snapshot());
+const initialPhase = engine.snapshot().phase;
 const samples = [];
 window.royaleHarness = {
   snapshot: () => ({
@@ -60,6 +61,10 @@ window.royaleHarness = {
     );
     const winners = samples.filter((s) => s.engine.phase === "finished");
     return [
+      {
+        name: "battle begins immediately without a countdown",
+        pass: initialPhase === "fighting",
+      },
       {
         name: "all six cats cast autonomously",
         pass: new Set(cast.map((e) => e.attacker)).size === 6,
