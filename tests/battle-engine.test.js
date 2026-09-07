@@ -327,6 +327,25 @@ test("the winner remains for eight seconds before the next round starts fighting
   );
 });
 
+test("wind moves fastest, earth slowest, and slowing still reduces elemental speed", () => {
+  const engine = createBattleEngine({ random: seeded(5) });
+  const positions = Array.from({ length: 6 }, (_, index) => ({
+    x: index * 0.2,
+    y: 0,
+    z: 0,
+  }));
+  engine.update(0.01, positions);
+  const speeds = engine.snapshot().fighters.map((f) => f.speed);
+  const order = [3, 4, 0, 2, 1, 5];
+  for (let i = 1; i < order.length; i++)
+    assert(speeds[order[i - 1]] > speeds[order[i]]);
+  assert(speeds[3] >= speeds[5] * 2.5);
+  assert(engine.cast(2, 3, 0).ok);
+  engine.update(0.01, positions);
+  near(fighter(engine, 3).speed, speeds[3] * 0.55);
+  near(fighter(engine, 4).speed, speeds[4]);
+});
+
 test("external scene positions are respected and frozen cats receive no movement intent", () => {
   const engine = createBattleEngine({ random: seeded(5) });
   const original = engine.snapshot().fighters.map((f) => ({ ...f.position }));

@@ -20,12 +20,21 @@ const makeMove = (
     ultimate,
     element,
   });
+const MOVEMENT_SPEED = Object.freeze({
+  fire: 0.95,
+  ice: 0.68,
+  dark: 0.85,
+  wind: 1.65,
+  lightning: 1.3,
+  earth: 0.55,
+});
 const resident = (index, element, label, color, rows) =>
   Object.freeze({
     index,
     element,
     label,
     color,
+    moveSpeed: MOVEMENT_SPEED[element],
     moves: Object.freeze(rows.map((row) => makeMove(element, ...row))),
   });
 
@@ -553,7 +562,7 @@ export function createBattleEngine({
         );
       }
       fighter.speed =
-        (0.7 + (fighter.index % 3) * 0.065) *
+        BATTLE_CATS[fighter.index].moveSpeed *
         (fighter.statuses.has("slow") ? 0.55 : 1);
       if (fighter.nextCast > 0 || gap > 3.2) continue;
       const available = [0, 1, 2].filter(

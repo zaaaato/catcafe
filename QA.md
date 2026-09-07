@@ -108,6 +108,8 @@ Historical manual-mode checks; superseded by the autonomous battle royale below.
 
 ## 2026-09-07 — Live transition and spectator camera controls
 
+Elemental speed follow-up: movement now uses wind 1.65, lightning 1.30, fire 0.95, dark 0.85, ice 0.68, earth 0.55 scene units/second. Wind is three times earth's base speed; slow still multiplies by 0.55 and freeze/paralysis still stop movement. All 59 unit tests, production build, and 21 live WebGL handover/round assertions passed.
+
 Follow-up: live entry now preserves all six cat positions and headings. Elevated cats retain their jump and descend naturally. All 21 live WebGL checks passed, including exact before/after position equality; a separate elevated-cat run retained its position and completed descent. All 58 unit tests and the production build passed. Round restart formations remain unchanged.
 
 - Secret activation loads its UI while the cafe keeps rendering, then transfers the existing scene and DOM into battle. No document reload, canvas replacement, whiteout, or loading overlay occurs. Old cafe UI listeners, timers, subscriptions, and audio are released before battle attaches its handlers.
