@@ -339,7 +339,8 @@ test("wind moves fastest, earth slowest, and slowing still reduces elemental spe
   const order = [3, 4, 0, 2, 1, 5];
   for (let i = 1; i < order.length; i++)
     assert(speeds[order[i - 1]] > speeds[order[i]]);
-  assert(speeds[3] >= speeds[5] * 2.5);
+  assert(speeds[3] >= speeds[5] * 30);
+  assert(speeds[3] >= 5);
   assert(engine.cast(2, 3, 0).ok);
   engine.update(0.01, positions);
   near(fighter(engine, 3).speed, speeds[3] * 0.55);

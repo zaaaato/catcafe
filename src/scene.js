@@ -2097,7 +2097,7 @@ export function createCafe(canvas, catsData, callbacks = {}, options = {}) {
               Math.atan2(
                 Math.sin(desired - cat.root.rotation.y),
                 Math.cos(desired - cat.root.rotation.y),
-              ) * Math.min(1, dt * 6);
+              ) * Math.min(1, dt * (battleMode ? 6 + speed * 3 : 6));
             moving = Math.hypot(nx - pos.x, nz - pos.z) > 0.00001;
             pos.x = nx;
             pos.z = nz;

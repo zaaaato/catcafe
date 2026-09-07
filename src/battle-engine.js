@@ -21,12 +21,12 @@ const makeMove = (
     element,
   });
 const MOVEMENT_SPEED = Object.freeze({
-  fire: 0.95,
-  ice: 0.68,
-  dark: 0.85,
-  wind: 1.65,
-  lightning: 1.3,
-  earth: 0.55,
+  fire: 1.5,
+  ice: 0.35,
+  dark: 0.8,
+  wind: 6,
+  lightning: 3,
+  earth: 0.15,
 });
 const resident = (index, element, label, color, rows) =>
   Object.freeze({

@@ -118,3 +118,8 @@ Follow-up: live entry now preserves all six cat positions and headings. Elevated
 - Actual browser hover confirmed identical canvas, WebGL context, and performance time origin before/after activation, with no loading overlay. Browser actions confirmed exact 1.15 zoom, changed camera position after dragging, fullscreen entry/exit, and PNG photo preview. Reload returns to ordinary cafe controls; toy mode still works.
 - Live WebGL handover harness: all 20 assertions passed through 100 simulated seconds and round four, including handover during care, camera preservation, released old interactions, idempotence, all six autonomous fighters, winners, context reuse, and finite room bounds.
 - `npm run check`: all 58 unit tests and production build passed.
+
+## Stronger speed contrast
+
+- Increased wind/lightning/fire/dark/ice/earth speeds to 6/3/1.5/0.8/0.35/0.15. Battle turning responds faster for fast cats. Wind now has forty times earth's base speed.
+- Real WebGL first-0.3-second net displacement measured approximately 1.00 for wind and 0.042 for earth. All 21 live battle checks, 59 unit tests, and production build passed.
