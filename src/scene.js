@@ -48,6 +48,7 @@ export function createCafe(canvas, catsData, callbacks = {}, options = {}) {
   controls.maxPolarAngle = Math.PI * 0.46;
   controls.minPolarAngle = 0.2;
   controls.enablePan = false;
+  if (battleMode) controls.enabled = false;
   const ambient = new THREE.HemisphereLight(0xfff7e6, 0x9b9c7c, 2.15);
   scene.add(ambient);
   const sun = new THREE.DirectionalLight(0xffe8b5, 4);
@@ -1064,10 +1065,7 @@ export function createCafe(canvas, catsData, callbacks = {}, options = {}) {
   heartShape.bezierCurveTo(0.27, 0.02, 0.15, 0.2, 0, 0.03);
   const heartGeo = new THREE.ShapeGeometry(heartShape);
   function pet(i) {
-    if (battleMode) {
-      callbacks.onBattleSelect?.(i);
-      return;
-    }
+    if (battleMode) return;
     const cat = cats[i];
     if (!cat || disposed || cat.pet > 2.4) return;
     cat.pet = 3;
@@ -1189,6 +1187,7 @@ export function createCafe(canvas, catsData, callbacks = {}, options = {}) {
     });
   }
   listen(canvas, "pointerdown", (event) => {
+    if (battleMode) return;
     if (!event.isPrimary || event.button !== 0) {
       down = null;
       return;
@@ -1202,6 +1201,10 @@ export function createCafe(canvas, catsData, callbacks = {}, options = {}) {
     };
   });
   listen(canvas, "pointermove", (event) => {
+    if (battleMode) {
+      canvas.style.cursor = "default";
+      return;
+    }
     if (down && Math.hypot(event.clientX - down.x, event.clientY - down.y) > 6)
       down.moved = true;
     canvas.style.cursor = interaction
@@ -1218,6 +1221,7 @@ export function createCafe(canvas, catsData, callbacks = {}, options = {}) {
     if (down && interaction && interaction.kind !== "feed") interact(event);
   });
   listen(canvas, "pointerup", (event) => {
+    if (battleMode) return;
     const start = down;
     down = null;
     if (
@@ -1748,21 +1752,23 @@ export function createCafe(canvas, catsData, callbacks = {}, options = {}) {
     ? createBattleEffects({ scene, cats, allowed, clearPath })
     : null;
   const battleMarkers = battleMode
-    ? [0xe3b55e, 0xcf776b].map((color) => {
-        const marker = new THREE.Mesh(
-          new THREE.RingGeometry(0.44, 0.48, 48),
-          new THREE.MeshBasicMaterial({
-            color,
-            side: THREE.DoubleSide,
-            transparent: true,
-            opacity: 0.85,
-            depthWrite: false,
-          }),
-        );
-        marker.rotation.x = -Math.PI / 2;
-        scene.add(marker);
-        return marker;
-      })
+    ? [0xed8655, 0x8acddd, 0xa899d6, 0x8acbaa, 0xdfc55e, 0xbd9d70].map(
+        (color) => {
+          const marker = new THREE.Mesh(
+            new THREE.RingGeometry(0.44, 0.48, 48),
+            new THREE.MeshBasicMaterial({
+              color,
+              side: THREE.DoubleSide,
+              transparent: true,
+              opacity: 0.85,
+              depthWrite: false,
+            }),
+          );
+          marker.rotation.x = -Math.PI / 2;
+          scene.add(marker);
+          return marker;
+        },
+      )
     : [];
   function resetBattlePositions() {
     if (!battleMode) return;
@@ -1783,6 +1789,7 @@ export function createCafe(canvas, catsData, callbacks = {}, options = {}) {
       cat.feedTime = 0;
       cat.brushTime = 0;
       cat.battleAttackTime = 0;
+      cat.battleDownTime = 0;
     });
   }
   resetBattlePositions();
@@ -1834,10 +1841,28 @@ export function createCafe(canvas, catsData, callbacks = {}, options = {}) {
       const jumping = updateJump(cat, dt);
       const interacting = interaction?.index === cat.index && !jumping;
       if (battleMode) {
-        cat.state = "rest";
-        cat.pose = fighter?.hp === 0 ? "sleep" : "stand";
+        const stopped =
+          !fighter ||
+          fighter.eliminated ||
+          fighter.hp <= 0 ||
+          fighter.statuses.some(
+            (status) =>
+              status.type === "freeze" ||
+              status.type === "paralyze" ||
+              status.type === "knockback",
+          ) ||
+          cat.battleAttackTime > 0.32 ||
+          battleSnapshot.phase !== "fighting";
+        cat.state = !stopped && fighter.moveTarget ? "walk" : "rest";
+        cat.pose = "stand";
         cat.timer = 2;
-        cat.target.copy(pos);
+        if (cat.state === "walk")
+          cat.target.set(fighter.moveTarget.x, -0.015, fighter.moveTarget.z);
+        else cat.target.copy(pos);
+        if (fighter?.hp > 0) {
+          cat.battleDownTime = 0;
+          cat.root.rotation.z = 0;
+        }
       } else if (jumping) {
       } else if (interacting) {
         cat.state = "rest";
@@ -1958,13 +1983,15 @@ export function createCafe(canvas, catsData, callbacks = {}, options = {}) {
           !interacting &&
           !yielding;
       const speed =
-        (socialAction?.moving
-          ? socialAction.speed
-          : pouncing
-            ? 2.25
-            : mode === "play"
-              ? 0.47 + cat.index * 0.027
-              : 0.3 + cat.index * 0.018) * (reducedMotion ? 0.38 : 1);
+        (battleMode
+          ? fighter?.speed || 0.75
+          : socialAction?.moving
+            ? socialAction.speed
+            : pouncing
+              ? 2.25
+              : mode === "play"
+                ? 0.47 + cat.index * 0.027
+                : 0.3 + cat.index * 0.018) * (reducedMotion ? 0.38 : 1);
       if (yielding) {
         const step = Math.min(0.4 * dt * (reducedMotion ? 0.5 : 1), 0.025);
         const nx = pos.x + yielding.x * step,
@@ -2036,6 +2063,7 @@ export function createCafe(canvas, catsData, callbacks = {}, options = {}) {
       } else if (
         cat.state === "walk" &&
         mode === "relax" &&
+        !battleMode &&
         cat.pet === 0 &&
         !socialAction
       ) {
@@ -2410,7 +2438,7 @@ export function createCafe(canvas, catsData, callbacks = {}, options = {}) {
       for (const eye of cat.eyes)
         eye.scale.y = THREE.MathUtils.damp(
           eye.scale.y,
-          sleeping || cat.pet > 0
+          sleeping || cat.pet > 0 || (battleMode && fighter?.hp === 0)
             ? 0.08
             : cat.blinkRemaining > 0
               ? 0.05
@@ -2591,13 +2619,22 @@ export function createCafe(canvas, catsData, callbacks = {}, options = {}) {
         cameraTransition = null;
     }
     battleEffects?.update(dt, battleSnapshot, { reducedMotion });
-    battleMarkers.forEach((marker, i) => {
-      const index =
-        i === 0
-          ? (battleSnapshot?.attacker ?? 0)
-          : (battleSnapshot?.target ?? 1);
+    if (battleMode)
+      cats.forEach((cat) => {
+        const fighter = battleSnapshot?.fighters?.[cat.index];
+        if (fighter?.hp !== 0) return;
+        cat.battleDownTime = (cat.battleDownTime || 0) + dt;
+        const t = Math.min(1, cat.battleDownTime / 0.65);
+        const eased = 1 - Math.pow(1 - t, 3);
+        const angle = (eased * Math.PI) / 2;
+        cat.root.rotation.z = (cat.index % 2 ? -1 : 1) * angle;
+        cat.root.position.y +=
+          Math.sin(angle) * 0.4 + Math.sin(t * Math.PI) * 0.08 * motion;
+      });
+    battleMarkers.forEach((marker, index) => {
       const cat = cats[index];
-      marker.visible = Boolean(cat);
+      marker.visible =
+        Boolean(cat) && battleSnapshot?.fighters?.[index]?.hp > 0;
       if (cat)
         marker.position.set(cat.root.position.x, 0.085, cat.root.position.z);
     });
@@ -2694,11 +2731,22 @@ export function createCafe(canvas, catsData, callbacks = {}, options = {}) {
     };
   }
   return {
+    getBattlePositions() {
+      return cats.map((cat) => ({
+        x: cat.root.position.x,
+        y: cat.root.position.y,
+        z: cat.root.position.z,
+      }));
+    },
     setBattleSnapshot(snapshot) {
       if (battleMode) battleSnapshot = snapshot;
     },
     playBattleEvent(event) {
       if (!battleMode || disposed) return;
+      if (event.type === "reset") {
+        this.resetBattle();
+        return;
+      }
       if (event.type === "cast" && cats[event.attacker] && cats[event.target]) {
         const cat = cats[event.attacker],
           target = cats[event.target].root.position;
@@ -2815,6 +2863,7 @@ export function createCafe(canvas, catsData, callbacks = {}, options = {}) {
       }
     },
     focus(i) {
+      if (battleMode) return;
       if (!Number.isInteger(i) || !cats[i] || disposed) return;
       focused = i;
       callbacks.onFocus?.(i);
@@ -2907,6 +2956,7 @@ export function createCafe(canvas, catsData, callbacks = {}, options = {}) {
           mood: cat.mood,
           state: cat.state,
           pose: cat.pose,
+          roll: cat.root.rotation.z,
           feeding: getFeedingDiagnostics(cat),
           tailTip: cat.tailTip.position.toArray(),
           social: social.get(cat)?.phase ?? null,

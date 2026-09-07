@@ -25,7 +25,7 @@ test("catalog contains six immutable elements and 24 unique, immediately usable 
       assert.equal(move.element, resident.element);
       assert(move.description.length > 5);
       assert(Object.isFrozen(move));
-      const engine = createBattleEngine();
+      const engine = createBattleEngine({ autonomous: false });
       const target = (resident.index + 1) % 6;
       assert(engine.cast(resident.index, target, index).ok);
       assert.equal(fighter(engine, target).hp, 100 - move.damage);
@@ -44,7 +44,7 @@ test("catalog contains six immutable elements and 24 unique, immediately usable 
 });
 
 test("invalid indices, self targeting and malformed elapsed time never mutate state", () => {
-  const engine = createBattleEngine();
+  const engine = createBattleEngine({ autonomous: false });
   const initial = engine.snapshot();
   for (const args of [
     [NaN, 1, 0],
@@ -69,7 +69,7 @@ test("invalid indices, self targeting and malformed elapsed time never mutate st
 });
 
 test("global cast delay and per-move cooldown are independently enforced", () => {
-  const engine = createBattleEngine();
+  const engine = createBattleEngine({ autonomous: false });
   assert(engine.cast(0, 1, 0).ok);
   assert.equal(engine.cast(0, 2, 1).code, "global-cooldown");
   engine.update(0.7);
@@ -80,7 +80,7 @@ test("global cast delay and per-move cooldown are independently enforced", () =>
 });
 
 test("ultimate costs 100 energy and regular moves replenish it without overflow", () => {
-  const engine = createBattleEngine();
+  const engine = createBattleEngine({ autonomous: false });
   assert(engine.cast(2, 0, 3).ok);
   assert.equal(fighter(engine, 2).energy, 0);
   engine.update(10);
@@ -99,7 +99,7 @@ test("freeze and paralysis block casting only for their remaining duration", () 
     [1, 2, 1.6, "frozen"],
     [4, 2, 1.2, "paralyzed"],
   ]) {
-    const engine = createBattleEngine();
+    const engine = createBattleEngine({ autonomous: false });
     assert(engine.cast(attacker, 0, move).ok);
     assert.equal(engine.cast(0, 3, 0).code, code);
     engine.update(duration + 0.001);
@@ -108,7 +108,7 @@ test("freeze and paralysis block casting only for their remaining duration", () 
 });
 
 test("shadow slowing extends the cast interval and repeated status hits do not stack rows", () => {
-  const engine = createBattleEngine();
+  const engine = createBattleEngine({ autonomous: false });
   assert(engine.cast(2, 0, 0).ok);
   assert(engine.cast(0, 3, 0).ok);
   engine.update(0.71);
@@ -125,7 +125,10 @@ test("shadow slowing extends the cast interval and repeated status hits do not s
 
 test("burn expires exactly and visual damage events are bounded at two per second", () => {
   const events = [];
-  const engine = createBattleEngine({ onEvent: (event) => events.push(event) });
+  const engine = createBattleEngine({
+    autonomous: false,
+    onEvent: (event) => events.push(event),
+  });
   assert(engine.cast(0, 1, 2).ok);
   for (let frame = 0; frame < 600; frame++) engine.update(1 / 60);
   near(fighter(engine, 1).hp, 70);
@@ -138,10 +141,13 @@ test("burn expires exactly and visual damage events are bounded at two per secon
   );
 });
 
-test("large and small time steps agree through burning, knockout and revival", () => {
+test("large and small time steps agree through burning and permanent round elimination", () => {
   const events = [];
-  const large = createBattleEngine({ onEvent: (event) => events.push(event) });
-  const small = createBattleEngine();
+  const large = createBattleEngine({
+    autonomous: false,
+    onEvent: (event) => events.push(event),
+  });
+  const small = createBattleEngine({ autonomous: false });
   burningKnockout(large);
   burningKnockout(small);
   large.update(8);
@@ -156,32 +162,37 @@ test("large and small time steps agree through burning, knockout and revival", (
       near(remaining, b.cooldowns[move]),
     );
   }
-  assert.equal(fighter(large, 1).hp, 100);
+  assert.equal(fighter(large, 1).hp, 0);
+  assert.equal(fighter(large, 1).eliminated, true);
   const down = events.find((event) => event.type === "down");
   const revive = events.find((event) => event.type === "revive");
   near(down.time, 1.5);
-  near(revive.time, 6.5);
+  assert.equal(revive, undefined);
 });
 
-test("a down fighter cannot act or be targeted and returns after five seconds", () => {
-  const engine = createBattleEngine();
+test("an eliminated fighter cannot act or return before the next round", () => {
+  const engine = createBattleEngine({ autonomous: false });
   assert(engine.cast(5, 0, 3).ok);
   assert(engine.cast(2, 0, 3).ok);
   assert(engine.cast(3, 0, 0).ok);
   assert.equal(fighter(engine, 0).hp, 0);
+  assert.equal(fighter(engine, 0).eliminated, true);
   assert.equal(engine.cast(0, 1, 0).code, "attacker-down");
   assert.equal(engine.cast(4, 0, 0).code, "target-down");
-  engine.update(4.99);
-  assert(fighter(engine, 0).downRemaining > 0);
-  engine.update(0.02);
+  engine.update(30);
+  assert.equal(fighter(engine, 0).hp, 0);
+  assert.equal(fighter(engine, 0).eliminated, true);
+  engine.reset();
   assert.equal(fighter(engine, 0).hp, 100);
-  assert.equal(fighter(engine, 0).energy, 100);
-  assert(engine.cast(0, 1, 3).ok);
+  assert.equal(fighter(engine, 0).eliminated, false);
 });
 
 test("cast events carry the actual target damage and snapshots cannot edit engine state", () => {
   const events = [];
-  const engine = createBattleEngine({ onEvent: (event) => events.push(event) });
+  const engine = createBattleEngine({
+    autonomous: false,
+    onEvent: (event) => events.push(event),
+  });
   engine.cast(5, 0, 3);
   engine.cast(2, 0, 3);
   engine.cast(3, 0, 0);
@@ -200,11 +211,176 @@ test("cast events carry the actual target damage and snapshots cannot edit engin
 });
 
 test("reset clears every combat timer, effect and resource change", () => {
-  const engine = createBattleEngine();
+  const engine = createBattleEngine({ autonomous: false });
   const initial = engine.snapshot();
   burningKnockout(engine);
   engine.update(0.75);
   engine.reset();
   assert.deepEqual(engine.snapshot(), initial);
   assert(engine.cast(0, 1, 3).ok);
+});
+
+function seeded(seed) {
+  let value = seed;
+  return () => {
+    value = (value * 1664525 + 1013904223) >>> 0;
+    return value / 4294967296;
+  };
+}
+function runToWinner(engine, maximumSeconds = 90) {
+  for (let frame = 0; frame < maximumSeconds / 0.05; frame++) {
+    engine.update(0.05);
+    if (engine.snapshot().phase === "finished") return engine.snapshot();
+  }
+  assert.fail("Autonomous battle did not reach a winner");
+}
+
+test("spectator mode starts with a real countdown and no input is needed for all six cats to fight", () => {
+  const events = [];
+  const engine = createBattleEngine({
+    random: seeded(1),
+    onEvent: (event) => events.push(event),
+  });
+  assert.equal(engine.snapshot().phase, "countdown");
+  assert.equal(engine.snapshot().countdown, 3);
+  assert(
+    engine
+      .snapshot()
+      .fighters.every(
+        (f) => f.energy === 35 && f.target === null && f.speed === 0,
+      ),
+  );
+  assert.equal(engine.cast(0, 1, 0).code, "not-fighting");
+  engine.update(2.9);
+  assert.equal(engine.snapshot().casts, 0);
+  assert.equal(engine.snapshot().phase, "countdown");
+  engine.update(0.1);
+  assert.equal(engine.snapshot().phase, "fighting");
+  const result = runToWinner(engine);
+  const attacks = events.filter((event) => event.type === "cast");
+  assert.equal(new Set(attacks.map((event) => event.attacker)).size, 6);
+  assert(attacks.some((event) => event.move.ultimate));
+  assert.equal(result.fighters.filter((f) => !f.eliminated).length, 1);
+  assert.equal(result.winner, result.fighters.find((f) => !f.eliminated).index);
+  assert.equal(events.filter((event) => event.type === "round-end").length, 1);
+});
+
+test("twelve deterministic autonomous matches all reach a winner and never restore eliminated cats mid-round", () => {
+  for (let seed = 1; seed <= 12; seed++) {
+    const engine = createBattleEngine({ random: seeded(seed) });
+    const eliminated = new Set();
+    let result;
+    for (let frame = 0; frame < 1800; frame++) {
+      engine.update(0.05);
+      result = engine.snapshot();
+      for (const resident of result.fighters) {
+        if (eliminated.has(resident.index)) assert(resident.eliminated);
+        if (resident.eliminated) {
+          eliminated.add(resident.index);
+          assert.equal(resident.hp, 0);
+          assert.equal(resident.speed, 0);
+          assert.equal(resident.moveTarget, null);
+        }
+        assert(Number.isFinite(resident.hp));
+        assert(resident.hp >= 0 && resident.hp <= 100);
+      }
+      if (result.phase === "finished") break;
+    }
+    assert.equal(result.phase, "finished", `seed ${seed}`);
+    assert.equal(eliminated.size, 5);
+  }
+});
+
+test("the winner remains for eight seconds before a reset event starts the next round countdown", () => {
+  const events = [];
+  const engine = createBattleEngine({
+    random: seeded(7),
+    onEvent: (event) => events.push(event),
+  });
+  const finished = runToWinner(engine);
+  const winner = finished.winner;
+  engine.update(7.85);
+  assert.equal(engine.snapshot().phase, "finished");
+  assert.equal(engine.snapshot().winner, winner);
+  assert.equal(engine.snapshot().round, 1);
+  engine.update(0.2);
+  const next = engine.snapshot();
+  assert.equal(next.round, 2);
+  assert.equal(next.phase, "countdown");
+  assert.equal(next.winner, null);
+  assert(
+    next.fighters.every(
+      (f) => f.hp === 100 && f.energy === 35 && !f.eliminated,
+    ),
+  );
+  assert.equal(
+    events.filter((event) => event.type === "reset" && event.round === 2)
+      .length,
+    1,
+  );
+});
+
+test("external scene positions are respected and frozen cats receive no movement intent", () => {
+  const engine = createBattleEngine({ random: seeded(5) });
+  const original = engine.snapshot().fighters.map((f) => ({ ...f.position }));
+  engine.update(3, original);
+  assert(engine.cast(1, 0, 2).ok);
+  engine.update(0.05, original);
+  const frozen = fighter(engine, 0);
+  assert.equal(frozen.speed, 0);
+  assert.equal(frozen.moveTarget, null);
+  assert.deepEqual(frozen.position, original[0]);
+  const other = engine
+    .snapshot()
+    .fighters.filter((f) => f.index !== 0 && f.moveTarget);
+  assert(other.length > 0);
+  for (const resident of other) {
+    assert(resident.moveTarget.x >= -1.8 && resident.moveTarget.x <= 1.8);
+    assert(resident.moveTarget.z >= -1 && resident.moveTarget.z <= 2.65);
+    assert(resident.target !== resident.index);
+  }
+  assert.deepEqual(
+    engine.snapshot().fighters.map((f) => f.position),
+    original,
+  );
+});
+
+test("autonomous ultimates require ordinary attacks first and eliminated opponents are never selected", () => {
+  const normals = new Map(),
+    dead = new Set();
+  const engine = createBattleEngine({
+    random: seeded(9),
+    onEvent: (event) => {
+      if (event.type === "cast") {
+        assert(!dead.has(event.target));
+        assert(!dead.has(event.attacker));
+        if (event.move.ultimate)
+          assert((normals.get(event.attacker) ?? 0) >= 3);
+        else
+          normals.set(event.attacker, (normals.get(event.attacker) ?? 0) + 1);
+      }
+      if (event.type === "down") dead.add(event.target);
+    },
+  });
+  runToWinner(engine);
+  assert.equal(dead.size, 5);
+});
+
+test("bad position samples and random values cannot put NaN into an autonomous match", () => {
+  const engine = createBattleEngine({ random: () => NaN });
+  engine.update(4, [
+    { x: NaN, z: 3 },
+    { x: 1, y: Infinity, z: 1 },
+  ]);
+  for (const resident of engine.snapshot().fighters) {
+    assert(Number.isFinite(resident.position.x));
+    assert(Number.isFinite(resident.position.y));
+    assert(Number.isFinite(resident.position.z));
+    if (resident.moveTarget)
+      assert(
+        Number.isFinite(resident.moveTarget.x) &&
+          Number.isFinite(resident.moveTarget.z),
+      );
+  }
+  assert.equal(engine.update(Number.MAX_VALUE), false);
 });

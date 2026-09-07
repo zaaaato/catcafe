@@ -5,7 +5,6 @@ import {
   Cat,
   ArrowLeft,
   ArrowRight,
-  Sparkles,
   Flame,
   Snowflake,
   Moon,
@@ -13,24 +12,15 @@ import {
   Zap,
   Mountain,
   Heart,
-  Shield,
-  RotateCcw,
-  Plus,
-  Minus,
-  Maximize,
-  Crosshair,
-  WandSparkles,
-  Clock3,
-  ChevronRight,
-  X,
   PawPrint,
+  Sun,
+  Trophy,
 } from "lucide";
 
 const icons = {
   Cat,
   ArrowLeft,
   ArrowRight,
-  Sparkles,
   Flame,
   Snowflake,
   Moon,
@@ -38,38 +28,18 @@ const icons = {
   Zap,
   Mountain,
   Heart,
-  Shield,
-  RotateCcw,
-  Plus,
-  Minus,
-  Maximize,
-  Crosshair,
-  WandSparkles,
-  Clock3,
-  ChevronRight,
-  X,
   PawPrint,
+  Sun,
+  Trophy,
 };
 const icon = (name) => `<i data-lucide="${name}"></i>`;
 const elementIcons = ["flame", "snowflake", "moon", "wind", "zap", "mountain"];
 const statusNames = {
-  paralyze: "しびれ",
-  knockback: "吹き飛び",
   burn: "やけど",
-  burning: "やけど",
   freeze: "凍結",
-  frozen: "凍結",
-  stun: "しびれ",
-  stunned: "しびれ",
+  paralyze: "しびれ",
   slow: "スロウ",
-  shield: "シールド",
-  vulnerable: "無防備",
-  weakness: "弱体",
-  poison: "毒",
-  blind: "目くらまし",
-  haste: "加速",
-  regen: "回復",
-  root: "足止め",
+  knockback: "吹き飛び",
 };
 const escapeHtml = (value) =>
   String(value ?? "").replace(
@@ -82,7 +52,7 @@ const escapeHtml = (value) =>
 const clamp = (value, min, max) =>
   Math.min(max, Math.max(min, Number.isFinite(value) ? value : min));
 
-/** Mounted after secret-mode activation; a normal cafe visit never calls this. */
+/** Secret mode is entirely autonomous; there are no battle command controls. */
 export function mountBattlePage({
   createCafe,
   BATTLE_CATS,
@@ -90,10 +60,6 @@ export function mountBattlePage({
 }) {
   const app = document.querySelector("#app");
   const $ = (selector) => app.querySelector(selector);
-  const catalog = BATTLE_CATS;
-  let attacker = 0;
-  let target = 1;
-  let selectionRole = "attacker";
   let scene;
   let engine;
   let ready = false;
@@ -101,21 +67,20 @@ export function mountBattlePage({
   let frame = 0;
   let lastTime = performance.now();
   let lastPaint = -Infinity;
-  let elapsed = 0;
-  let currentSnapshot;
-  let lastMoveMarkup = "";
+  let snapshot;
+  let lastPhase = "";
+  let lastOverlay = "";
+  const lastMoves = new Map();
   const combatLog = [];
   const events = new AbortController();
   const refreshIcons = () => createIcons({ icons });
-  const fighter = (index) =>
-    currentSnapshot?.fighters?.find((item) => item.index === index);
-  const color = (index) => catalog[index]?.color || cats[index].color;
-  const elementLabel = (index) =>
-    catalog[index]?.label || catalog[index]?.element || "魔法";
+  const color = (index) => BATTLE_CATS[index]?.color || cats[index].color;
+  const label = (index) => BATTLE_CATS[index]?.label || "魔法";
   const listen = (element, type, handler) =>
     element.addEventListener(type, handler, { signal: events.signal });
-  document.title = "ねこ魔法アリーナ | こもれび";
-  app.innerHTML = `<div class="battle-page"><a class="battle-skip" href="#battle-moves">技を選ぶ操作へ</a><header class="battle-header"><a class="battle-brand" href="${import.meta.env.BASE_URL}" aria-label="こもれび猫カフェへ戻る"><span>${icon("cat")}</span><div><strong>こもれび<span>.</span></strong><small>VIRTUAL CAT CAFÉ</small></div></a><span class="battle-header-label">A LITTLE MAGIC, A LITTLE MISCHIEF.</span><a class="battle-back" href="${import.meta.env.BASE_URL}">${icon("arrow-left")} カフェに戻る</a></header><main class="battle-main"><section class="battle-intro"><div><span class="battle-eyebrow">KOMOREBI MAGIC ARENA</span><h1>いつもの猫に、ちょっと魔法を。</h1><p>6匹それぞれの力で、気ままに手合わせ。好きな猫と技を選んでみて。</p></div><span class="battle-room-tag">${icon("sparkles")} ねこ魔法アリーナ</span></section><div class="battle-layout"><section class="battle-experience" aria-label="魔法の手合わせ"><div class="battle-scene" id="battle-scene"><canvas id="battle-canvas" tabindex="0" aria-label="6匹の猫の魔法アリーナ。ドラッグで見回し、1から4キーで選んだ猫の技を使えます。"></canvas><div class="battle-scoreboard"><div class="battle-combatant" id="battle-attacker-hud"></div><span class="battle-vs">VS</span><div class="battle-combatant is-opponent" id="battle-target-hud"></div></div><div class="battle-camera"><button id="battle-zoom-in" aria-label="アリーナを拡大" title="拡大">${icon("plus")}</button><button id="battle-zoom-out" aria-label="アリーナを縮小" title="縮小">${icon("minus")}</button><button id="battle-view-reset" aria-label="視点を戻す" title="視点を戻す">${icon("rotate-ccw")}</button><button id="battle-fullscreen" aria-label="全画面で見る" title="全画面で見る">${icon("maximize")}</button></div><span class="battle-scene-note">${icon("wand-sparkles")} 猫を選んで、魔法で手合わせ。</span><div id="battle-announcer" class="battle-announcer" role="status" aria-live="polite" aria-atomic="true"></div><div class="battle-loading" id="battle-loading" role="status"><span>${icon("sparkles")}</span><strong>魔法の準備をしています。</strong><p>猫たちが、まもなく集まります。</p></div></div><div class="battle-move-heading"><div><span class="battle-eyebrow">CHOOSE YOUR SPELL</span><h2 id="battle-move-title">きなこの魔法</h2></div><span class="battle-key-hint"><kbd>1</kbd>〜<kbd>4</kbd> キーでも使えます</span></div><div class="battle-moves" id="battle-moves" tabindex="-1" aria-label="使う技を選ぶ"></div><div class="battle-afterword"><span>${icon("heart")} HPがなくなると、少し休んで元気に戻ります。</span><span id="battle-elapsed">00:00</span></div></section><aside class="battle-sidebar" aria-label="手合わせする猫を選ぶ"><div class="battle-roster-heading"><span class="battle-eyebrow">PICK YOUR PARTNERS</span><h2>だれと、手合わせする？</h2></div><div class="battle-role-tabs" aria-label="猫の選択先"><button data-battle-role="attacker" class="active" aria-pressed="true">${icon("wand-sparkles")} 技を使う猫</button><button data-battle-role="target" aria-pressed="false">${icon("crosshair")} 相手の猫</button></div><p class="battle-selection-hint" id="battle-selection-hint">技を使う猫を選んでください。</p><div class="battle-roster">${cats.map((cat, index) => `<button class="battle-cat" data-battle-cat="${index}" style="--fighter-color:${escapeHtml(color(index))}" aria-label="${cat.name}、${escapeHtml(elementLabel(index))}属性を選ぶ"><span class="battle-cat-avatar" style="--coat:${cat.color}">${icon("cat")}</span><span class="battle-cat-copy"><span class="battle-cat-name">${cat.name}<small>${cat.en}</small></span><span class="battle-cat-element">${icon(elementIcons[index])} ${escapeHtml(elementLabel(index))}</span></span><span class="battle-cat-role" id="battle-role-${index}"></span></button>`).join("")}</div><div class="battle-log-panel"><h3>${icon("sparkles")} いまの手合わせ</h3><ol id="battle-log"><li class="battle-log-empty">猫と技を選んだら、はじめの一手を。</li></ol></div><button id="battle-reset" class="battle-reset">${icon("rotate-ccw")} みんな元気に、やり直す</button><p class="battle-disclaimer">技は自分で選んで使えます。<br>カフェの親密度や設定には影響しません。<br>再読み込みすると、いつものカフェへ。</p></aside></div><footer class="battle-footer"><span>${icon("paw-print")} 心に、ひなたと、ちいさな魔法。</span><a href="${import.meta.env.BASE_URL}">いつものカフェで、ひと休み ${icon("arrow-right")}</a></footer></main></div>`;
+  document.title = "こもれび | Virtual Cat Café";
+  app.innerHTML = `<div class="battle-page"><header class="battle-header"><a class="battle-brand" href="${import.meta.env.BASE_URL}" aria-label="こもれび猫カフェへ戻る"><span>${icon("cat")}</span><div><strong>こもれび<span>.</span></strong><small>VIRTUAL CAT CAFÉ</small></div></a><span class="battle-header-label">いつでも、ひとやすみ。</span><a class="battle-back" href="${import.meta.env.BASE_URL}">${icon("arrow-left")} カフェに戻る</a></header><main class="battle-main"><section class="battle-intro"><div><span class="battle-eyebrow">A LITTLE PAUSE, A LITTLE PURR.</span><h1>猫と、なにもしない時間。</h1><p>ここは、いつでも帰ってこられる小さな猫カフェ。<br class="battle-mobile-break">お気に入りの子と、のんびり過ごしていきませんか。</p></div><span class="battle-intro-note">${icon("sun")}<span>陽だまり、あります。<small>今日はどの子と過ごす？</small></span></span></section><div class="battle-layout"><section class="battle-experience" aria-label="猫たちの様子"><div class="battle-scene" id="battle-scene"><canvas id="battle-canvas" aria-label="6匹の猫が自由に魔法を放つ、自動進行のバトルロイヤル"></canvas><div class="battle-scene-top"><span class="battle-round" id="battle-round">ROUND 1</span><span class="battle-alive">残り <strong id="battle-alive">6</strong> 匹</span></div><div class="battle-phase-overlay" id="battle-phase-overlay" hidden aria-live="polite" aria-atomic="true"></div><span class="battle-scene-note">${icon("paw-print")} ただいま、猫たちがくつろぎ中</span><div id="battle-announcer" class="battle-announcer" role="status" aria-live="polite" aria-atomic="true"></div><div class="battle-loading" id="battle-loading" role="status"><span>${icon("cat")}</span><strong>猫たちが、お迎えの準備中。</strong><p>まもなくカフェが開きます。</p></div></div><div class="battle-afterword">${icon("heart")} ごゆっくり。猫たちが勝手にやっています。</div><div class="battle-log-panel"><div class="battle-log-heading"><span class="battle-eyebrow">TODAY AT KOMOREBI</span><h2>カフェのできごと</h2></div><ol id="battle-log"><li class="battle-log-empty">猫たちを、そっと見守っていてください。</li></ol></div></section><aside class="battle-sidebar" aria-label="カフェの猫たちの状態"><div class="battle-roster-heading"><div><span class="battle-eyebrow">MEET THE RESIDENTS</span><h2>カフェのねこたち</h2></div><span class="battle-roster-count">6</span></div><div class="battle-roster">${cats.map((cat, index) => `<article class="battle-cat" id="battle-fighter-${index}" style="--fighter-color:${escapeHtml(color(index))}" aria-label="${cat.name}の状態"><div class="battle-cat-top"><span class="battle-cat-avatar" style="--coat:${cat.color}">${icon("cat")}</span><div class="battle-cat-copy"><span class="battle-cat-name">${cat.name}<small>${cat.en}</small></span><span class="battle-cat-element">${icon(elementIcons[index])} ${escapeHtml(label(index))}</span></div><span class="battle-fighter-state" id="battle-fighter-state-${index}">のんびり</span></div><div class="battle-fighter-data" id="battle-fighter-data-${index}"></div></article>`).join("")}</div><p class="battle-sidebar-note">猫たちの気分に合わせて、ゆっくり。<br>再読み込みすると、いつものカフェへ。</p></aside></div><footer class="battle-footer"><span>${icon("paw-print")} こもれび <span>/</span> 心に、ひなたを。</span><a href="${import.meta.env.BASE_URL}">いつものカフェで、ひと休み ${icon("arrow-right")}</a></footer></main></div>`;
+  $(".battle-layout").append($(".battle-log-panel"));
   refreshIcons();
 
   function announce(message) {
@@ -124,247 +89,128 @@ export function mountBattlePage({
     clearTimeout(announce.timeout);
     announce.timeout = setTimeout(
       () => $("#battle-announcer")?.classList.remove("show"),
-      3400,
+      2600,
     );
   }
   function setUnavailable(message) {
     ready = false;
     $("#battle-loading").hidden = false;
     $("#battle-loading").innerHTML =
-      `<strong>アリーナを開けませんでした。</strong><p>${escapeHtml(message)}</p><button id="battle-retry">もう一度ひらく</button>`;
+      `<strong>カフェを開けませんでした。</strong><p>${escapeHtml(message)}</p><button id="battle-retry">もう一度ひらく</button>`;
     listen($("#battle-retry"), "click", () => location.reload());
-    app
-      .querySelectorAll(".battle-move, .battle-camera button")
-      .forEach((button) => {
-        button.disabled = true;
-      });
   }
-  function renderCombatant(index, id, role) {
-    const data = fighter(index) || {
-      hp: 100,
-      maxHp: 100,
-      energy: 100,
-      statuses: [],
-    };
-    const hp = Math.ceil(clamp(data.hp, 0, data.maxHp || 100));
+  function renderLog() {
+    $("#battle-log").innerHTML = combatLog.length
+      ? combatLog
+          .map(
+            (item) =>
+              `<li><span>${escapeHtml(item.message)}</span>${item.detail ? `<small>${escapeHtml(item.detail)}</small>` : ""}</li>`,
+          )
+          .join("")
+      : '<li class="battle-log-empty">猫たちを、そっと見守っていてください。</li>';
+  }
+  function addLog(message, detail = "") {
+    combatLog.unshift({ message, detail });
+    combatLog.splice(6);
+    renderLog();
+  }
+  function renderFighter(data) {
+    const index = data.index;
+    if (!cats[index]) return;
     const maxHp = data.maxHp || 100;
+    const hp = Math.ceil(clamp(data.hp, 0, maxHp));
     const energy = Math.floor(clamp(data.energy, 0, 100));
-    const statuses = (data.statuses || [])
-      .map(
-        (status) =>
-          `<span>${escapeHtml(statusNames[status.type] || status.type)} ${Math.ceil(status.remaining)}s</span>`,
-      )
-      .join("");
-    $(id).style.setProperty("--fighter-color", color(index));
-    $(id).innerHTML =
-      `<div class="battle-combatant-top"><span class="battle-combatant-role">${role}</span><span class="battle-combatant-element">${escapeHtml(elementLabel(index))}</span></div><div class="battle-combatant-name"><strong>${cats[index].name}</strong><span>${hp}<small> / ${maxHp}</small></span></div><div class="battle-health" role="progressbar" aria-label="${cats[index].name}のHP" aria-valuemin="0" aria-valuemax="${maxHp}" aria-valuenow="${hp}"><span style="width:${(hp / maxHp) * 100}%"></span></div><div class="battle-energy-label"><span>魔力</span><span>${energy} / 100</span></div><div class="battle-energy" role="progressbar" aria-label="${cats[index].name}の魔力" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${energy}"><span style="width:${energy}%"></span></div><div class="battle-statuses">${data.downRemaining > 0 ? `<span class="battle-rest-status">ひと休み ${Math.ceil(data.downRemaining)}s</span>` : statuses || '<span class="battle-ready-status">元気いっぱい</span>'}</div>`;
+    const eliminated = Boolean(data.eliminated);
+    const statuses = (data.statuses || []).map(
+      (status) =>
+        `${statusNames[status.type] || status.type} ${Math.ceil(status.remaining)}s`,
+    );
+    const phase = snapshot.phase;
+    const targetName =
+      Number.isInteger(data.target) && cats[data.target]
+        ? cats[data.target].name
+        : null;
+    const state = eliminated
+      ? "ひと休み"
+      : phase === "countdown"
+        ? "きょろきょろ"
+        : phase === "finished" && snapshot.winner === index
+          ? "最後の1匹"
+          : statuses.length
+            ? statuses.join(" · ")
+            : "元気いっぱい";
+    $(`#battle-fighter-${index}`).classList.toggle("is-eliminated", eliminated);
+    $(`#battle-fighter-${index}`).classList.toggle(
+      "is-winner",
+      phase === "finished" && snapshot.winner === index,
+    );
+    $(`#battle-fighter-state-${index}`).textContent = state;
+    $(`#battle-fighter-data-${index}`).innerHTML =
+      `<div class="battle-meter-label"><span>HP</span><span>${hp} / ${maxHp}</span></div><div class="battle-health" role="progressbar" aria-label="${cats[index].name}のHP" aria-valuemin="0" aria-valuemax="${maxHp}" aria-valuenow="${hp}"><span style="width:${(hp / maxHp) * 100}%"></span></div><div class="battle-meter-label is-energy"><span>魔力</span><span>${energy} / 100</span></div><div class="battle-energy" role="progressbar" aria-label="${cats[index].name}の魔力" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${energy}"><span style="width:${energy}%"></span></div><div class="battle-cat-thought"><span>${eliminated ? "次のラウンドまで、すやすや。" : targetName && phase === "fighting" ? `${targetName}を見ています` : "気ままに過ごしています"}</span><small>${escapeHtml(lastMoves.get(index) || "まだ、なにもしていません。")}</small></div>`;
   }
-  function lockReason(move, index) {
-    if (!ready) return "準備中";
-    const data = fighter(attacker);
-    const opponent = fighter(target);
-    if (data?.downRemaining > 0 || data?.hp <= 0) return "ひと休み中";
-    if (opponent?.downRemaining > 0 || opponent?.hp <= 0)
-      return "相手はひと休み中";
-    if (data?.statuses?.some((status) => status.type === "freeze"))
-      return "凍結中";
-    if (data?.statuses?.some((status) => status.type === "paralyze"))
-      return "しびれ中";
-    if (data?.globalCooldown > 0) return "次の魔法を準備中";
-    const cooldown = data?.cooldowns?.[index] || 0;
-    if (cooldown > 0) return `あと ${Math.ceil(cooldown)} 秒`;
-    if (move.ultimate && (data?.energy ?? 0) < 100)
-      return "魔力を100までためよう";
-    return "";
-  }
-  function renderMoves(force = false) {
-    const moves = catalog[attacker]?.moves || [];
-    const markup = moves
-      .map((move, index) => {
-        const reason = lockReason(move, index);
-        return `<button class="battle-move ${move.ultimate ? "is-ultimate" : ""}" data-battle-move="${index}" style="--fighter-color:${escapeHtml(color(attacker))}" ${reason ? "disabled" : ""} aria-label="${escapeHtml(move.name)}。${escapeHtml(reason || move.description)}"><span class="battle-move-top"><span class="battle-move-number">${index + 1}</span><span class="battle-move-kind">${move.ultimate ? "ULTIMATE · 究極魔法" : `${escapeHtml(elementLabel(attacker))}の魔法`}</span>${icon(move.ultimate ? "sparkles" : elementIcons[attacker])}</span><strong>${escapeHtml(move.name)}</strong><p>${escapeHtml(move.description)}</p><span class="battle-move-bottom"><span>${move.damage > 0 ? `威力 ${move.damage}` : "サポート"} <span>·</span> 再使用 ${move.cooldown}s</span><span class="battle-move-state">${escapeHtml(reason || (move.ultimate ? "魔力100で発動" : "使う"))}${!reason ? icon("chevron-right") : ""}</span></span></button>`;
-      })
-      .join("");
-    if (force || markup !== lastMoveMarkup) {
-      // Keep keyboard focus on the same move as its cooldown changes.
-      const focusedMove = document.activeElement?.dataset?.battleMove;
-      $("#battle-moves").innerHTML = markup;
-      lastMoveMarkup = markup;
-      refreshIcons();
-      if (focusedMove !== undefined) {
-        const nextButton = $(`[data-battle-move="${focusedMove}"]`);
-        if (nextButton && !nextButton.disabled)
-          nextButton.focus({ preventScroll: true });
-        else $("#battle-moves").focus({ preventScroll: true });
-      }
+  function renderHUD() {
+    if (!snapshot) return;
+    const fighters = snapshot.fighters || [];
+    const alive = fighters.filter(
+      (item) => !item.eliminated && item.hp > 0,
+    ).length;
+    $("#battle-round").textContent = `ROUND ${snapshot.round || 1}`;
+    $("#battle-alive").textContent = String(alive);
+    fighters.forEach(renderFighter);
+    const phase = snapshot.phase;
+    let overlay = "";
+    if (phase === "countdown")
+      overlay = `<span class="battle-overlay-eyebrow">まもなく、はじまります。</span><strong class="battle-countdown">${Math.max(1, Math.ceil(snapshot.countdown || 0))}</strong>`;
+    else if (phase === "finished") {
+      const winner = Number.isInteger(snapshot.winner)
+        ? cats[snapshot.winner]
+        : null;
+      overlay = `<span class="battle-overlay-eyebrow">${winner ? "本日の圧倒的ねこ" : "みんな、ひと休み"}</span><strong class="battle-winner-name">${winner ? winner.name : "引き分け"}</strong><span class="battle-next-round">次の乱闘まで ${Math.max(0, Math.ceil(snapshot.nextRoundIn || 0))} 秒</span>`;
     }
-  }
-  function renderHUD(force = false) {
-    if (!currentSnapshot) return;
-    renderCombatant(attacker, "#battle-attacker-hud", "技を使う猫");
-    renderCombatant(target, "#battle-target-hud", "相手の猫");
-    renderMoves(force);
-    $("#battle-elapsed").textContent =
-      `${String(Math.floor(elapsed / 60)).padStart(2, "0")}:${String(Math.floor(elapsed % 60)).padStart(2, "0")}`;
-  }
-  function renderSelections() {
-    app.querySelectorAll("[data-battle-cat]").forEach((button) => {
-      const index = Number(button.dataset.battleCat);
-      button.classList.toggle("is-attacker", index === attacker);
-      button.classList.toggle("is-target", index === target);
-      button.setAttribute(
-        "aria-pressed",
-        String(index === (selectionRole === "attacker" ? attacker : target)),
-      );
-      $(`#battle-role-${index}`).textContent =
-        index === attacker ? "使う猫" : index === target ? "相手" : "";
-    });
-    app.querySelectorAll("[data-battle-role]").forEach((button) => {
-      const active = button.dataset.battleRole === selectionRole;
-      button.classList.toggle("active", active);
-      button.setAttribute("aria-pressed", String(active));
-    });
-    $("#battle-selection-hint").textContent =
-      selectionRole === "attacker"
-        ? "技を使う猫を選んでください。"
-        : "魔法を向ける相手の猫を選んでください。";
-    $("#battle-move-title").textContent = `${cats[attacker].name}の魔法`;
-  }
-  function selectCat(index) {
-    if (!Number.isInteger(index) || !cats[index]) return;
-    if (selectionRole === "attacker") {
-      if (index === target) target = attacker;
-      attacker = index;
-    } else {
-      if (index === attacker) attacker = target;
-      target = index;
+    $("#battle-phase-overlay").hidden = !overlay;
+    if (overlay !== lastOverlay) {
+      $("#battle-phase-overlay").innerHTML = overlay;
+      lastOverlay = overlay;
     }
-    renderSelections();
-    renderHUD(true);
-    scene?.setBattleSnapshot?.({ ...currentSnapshot, attacker, target });
-    scene?.focus?.(index);
+    if (phase !== lastPhase) {
+      if (phase === "fighting") announce("いつもどおり、ごゆっくり。");
+      lastPhase = phase;
+    }
   }
   function onBattleEvent(event) {
+    // The scene owns visual reset handling, so forward each event exactly once.
     scene?.playBattleEvent?.(event);
-    if (event.type === "cast") {
+    if (event.type === "reset") {
+      lastMoves.clear();
+      combatLog.length = 0;
+      renderLog();
+    } else if (event.type === "cast") {
       const source = cats[event.attacker];
       const recipient = cats[event.target];
       const move =
         typeof event.move === "object"
           ? event.move
-          : catalog[event.attacker]?.moves?.find(
+          : BATTLE_CATS[event.attacker]?.moves?.find(
               (item) => item.id === event.move,
             );
       const moveName = move?.name || event.moveName || "魔法";
-      const message = `${source?.name || "猫"}の「${moveName}」！`;
-      announce(message);
-      combatLog.unshift({
-        message,
-        detail: `${recipient?.name || "相手"}へ${event.damage > 0 ? ` · ${Math.round(event.damage)}ダメージ` : ""}`,
-      });
-      combatLog.splice(4);
-      $("#battle-log").innerHTML = combatLog
-        .map(
-          (item) =>
-            `<li><strong>${escapeHtml(item.message)}</strong><span>${escapeHtml(item.detail)}</span></li>`,
-        )
-        .join("");
-    }
+      lastMoves.set(event.attacker, moveName);
+      addLog(
+        `${source?.name || "猫"}の「${moveName}」`,
+        `${recipient?.name || "相手"}へ${event.damage > 0 ? ` · ${Math.round(event.damage)}ダメージ` : ""}`,
+      );
+    } else if (event.type === "down")
+      addLog(`${cats[event.target]?.name || "猫"}は、ひと休み。`);
   }
-  function cast(index) {
-    if (!ready || !catalog[attacker]?.moves?.[index]) return;
-    const result = engine.cast(attacker, target, index);
-    if (!result.ok) announce(result.reason || "少し待って、もう一度。");
-    currentSnapshot = engine.snapshot();
-    scene?.setBattleSnapshot?.({ ...currentSnapshot, attacker, target });
-    renderHUD(true);
-  }
-  try {
-    engine = createBattleEngine({ onEvent: onBattleEvent });
-    currentSnapshot = engine.snapshot();
-  } catch (error) {
-    console.error("Battle engine could not start:", error);
-    setUnavailable(
-      "魔法の準備に失敗しました。もう一度ページを開いてお試しください。",
-    );
-    return { dispose };
-  }
-  renderSelections();
-  renderHUD(true);
-  listen($("#battle-moves"), "click", (event) => {
-    const button = event.target.closest("[data-battle-move]");
-    if (button && !button.disabled) cast(Number(button.dataset.battleMove));
-  });
-  app
-    .querySelectorAll("[data-battle-cat]")
-    .forEach((button) =>
-      listen(button, "click", () =>
-        selectCat(Number(button.dataset.battleCat)),
-      ),
-    );
-  app.querySelectorAll("[data-battle-role]").forEach((button) =>
-    listen(button, "click", () => {
-      selectionRole = button.dataset.battleRole;
-      renderSelections();
-    }),
-  );
-  listen($("#battle-reset"), "click", () => {
-    engine.reset();
-    scene?.resetBattle?.();
-    elapsed = 0;
-    combatLog.length = 0;
-    $("#battle-log").innerHTML =
-      '<li class="battle-log-empty">みんな元気に。次は、どんな魔法にする？</li>';
-    currentSnapshot = engine.snapshot();
-    scene?.setBattleSnapshot?.({ ...currentSnapshot, attacker, target });
-    renderHUD(true);
-    announce("みんな元気になりました。もう一度、手合わせを。");
-  });
-  listen($("#battle-zoom-in"), "click", () => scene?.zoom(1.15));
-  listen($("#battle-zoom-out"), "click", () => scene?.zoom(1 / 1.15));
-  listen($("#battle-view-reset"), "click", () => scene?.reset());
-  listen($("#battle-fullscreen"), "click", async () => {
-    try {
-      if (document.fullscreenElement) await document.exitFullscreen();
-      else await $("#battle-scene").requestFullscreen();
-    } catch {
-      announce("このブラウザでは全画面表示を利用できません。");
-    }
-  });
-  listen(document, "keydown", (event) => {
-    if (
-      event.defaultPrevented ||
-      event.repeat ||
-      event.metaKey ||
-      event.ctrlKey ||
-      event.altKey ||
-      !ready ||
-      document.querySelector("dialog[open]")
-    )
-      return;
-    if (event.target.closest('input,select,textarea,[contenteditable="true"]'))
-      return;
-    if (/^[1-4]$/.test(event.key)) {
-      event.preventDefault();
-      cast(Number(event.key) - 1);
-    }
-  });
-  listen($("#battle-canvas"), "webglcontextlost", (event) => {
-    event.preventDefault();
-    setUnavailable(
-      "3D表示が中断されました。ほかのタブを閉じてから、もう一度お試しください。",
-    );
-  });
   function tick(now) {
     if (disposed) return;
     frame = requestAnimationFrame(tick);
     const dt = Math.min(Math.max((now - lastTime) / 1000, 0), 0.06);
     lastTime = now;
     if (document.hidden || !ready) return;
-    engine.update(dt);
-    elapsed += dt;
-    currentSnapshot = engine.snapshot();
-    scene?.setBattleSnapshot?.({ ...currentSnapshot, attacker, target });
+    engine.update(dt, scene?.getBattlePositions?.());
+    snapshot = engine.snapshot();
+    scene?.setBattleSnapshot?.(snapshot);
     if (now - lastPaint >= 100) {
       renderHUD();
       lastPaint = now;
@@ -378,6 +224,23 @@ export function mountBattlePage({
     events.abort();
     scene?.dispose();
   }
+  try {
+    engine = createBattleEngine({ onEvent: onBattleEvent, autonomous: true });
+    snapshot = engine.snapshot();
+  } catch (error) {
+    console.error("Battle engine could not start:", error);
+    setUnavailable(
+      "猫たちを表示できませんでした。もう一度ページを開いてお試しください。",
+    );
+    return { dispose };
+  }
+  renderHUD();
+  listen($("#battle-canvas"), "webglcontextlost", (event) => {
+    event.preventDefault();
+    setUnavailable(
+      "3D表示が中断されました。ほかのタブを閉じてから、もう一度お試しください。",
+    );
+  });
   listen(document, "visibilitychange", () => {
     lastTime = performance.now();
   });
@@ -397,17 +260,17 @@ export function mountBattlePage({
       scene = createCafe(
         $("#battle-canvas"),
         cats,
-        { onBattleSelect: selectCat },
-        { battle: true },
+        {},
+        { battle: true, spectator: true },
       );
       scene.setQuality?.(window.innerWidth < 600 ? "low" : "balanced");
       scene.setReducedMotion?.(
         window.matchMedia("(prefers-reduced-motion: reduce)").matches,
       );
-      scene.setBattleSnapshot?.({ ...currentSnapshot, attacker, target });
+      scene.setBattleSnapshot?.(snapshot);
       ready = true;
       $("#battle-loading").hidden = true;
-      renderHUD(true);
+      renderHUD();
       lastTime = performance.now();
       frame = requestAnimationFrame(tick);
     } catch (error) {

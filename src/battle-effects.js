@@ -9,7 +9,8 @@ const COLORS = {
   earth: 0xd6ad78,
 };
 const UP = new THREE.Vector3(0, 1, 0);
-const CAPACITY = 100;
+const CAPACITY = 140;
+const PROJECTILE_RESERVE = 12;
 const FLOOR = -0.015;
 
 /** Small, pooled fantasy effects. Owns its graphics, never the cats' materials. */
@@ -22,12 +23,25 @@ export function createBattleEffects({
   const container = new THREE.Group();
   container.name = "cafe-battle-effects";
   scene.add(container);
+  const starShape = new THREE.Shape();
+  for (let i = 0; i < 10; i++) {
+    const angle = Math.PI / 2 + (i * Math.PI) / 5;
+    const radius = i % 2 ? 0.43 : 1;
+    if (i === 0)
+      starShape.moveTo(Math.cos(angle) * radius, Math.sin(angle) * radius);
+    else starShape.lineTo(Math.cos(angle) * radius, Math.sin(angle) * radius);
+  }
+  starShape.closePath();
   const geometry = {
     orb: new THREE.IcosahedronGeometry(1, 1),
     crystal: new THREE.OctahedronGeometry(1),
     shard: new THREE.BoxGeometry(1, 1, 1),
     ring: new THREE.TorusGeometry(1, 0.045, 5, 32),
     beam: new THREE.CylinderGeometry(1, 1, 1, 5),
+    star: new THREE.ExtrudeGeometry(starShape, {
+      depth: 0.12,
+      bevelEnabled: false,
+    }),
   };
   const pool = Array.from({ length: CAPACITY }, () => {
     const material = new THREE.MeshBasicMaterial({
@@ -36,6 +50,7 @@ export function createBattleEffects({
       depthWrite: false,
       blending: THREE.AdditiveBlending,
       toneMapped: false,
+      side: THREE.DoubleSide,
     });
     const mesh = new THREE.Mesh(geometry.orb, material);
     mesh.visible = false;
@@ -58,6 +73,7 @@ export function createBattleEffects({
       element: "wind",
       impact: null,
       nextTrail: 0,
+      phase: 0,
     };
   });
   const knocks = new Map();
@@ -82,6 +98,9 @@ export function createBattleEffects({
   function acquire(kind, element, size, life) {
     if (disposed) return null;
     let particle;
+    let free = 0;
+    for (const candidate of pool) if (!candidate.active) free++;
+    if (kind !== "projectile" && free <= PROJECTILE_RESERVE) return null;
     for (let i = 0; i < CAPACITY; i++) {
       const candidate = pool[(cursor + i) % CAPACITY];
       if (!candidate.active) {
@@ -90,8 +109,20 @@ export function createBattleEffects({
         break;
       }
     }
-    // Ambient sparks can be dropped when the scene is busy. Do not evict a
-    // projectile, as its arrival carries the visual impact and knockback.
+    // A cast must reach its target even when a crowd of sparkles fills the pool.
+    // Cosmetics may be replaced; an in-flight projectile is never evicted.
+    if (!particle && kind === "projectile") {
+      let shortest = Infinity;
+      for (const candidate of pool) {
+        if (
+          candidate.kind !== "projectile" &&
+          candidate.life - candidate.age < shortest
+        ) {
+          shortest = candidate.life - candidate.age;
+          particle = candidate;
+        }
+      }
+    }
     if (!particle) return null;
     Object.assign(particle, {
       active: true,
@@ -105,25 +136,35 @@ export function createBattleEffects({
       ultimate: false,
       impact: null,
       nextTrail: 0,
+      phase: Math.random() * Math.PI * 2,
     });
     const mesh = particle.mesh;
     mesh.visible = true;
     mesh.geometry =
       geometry[
-        kind === "ring"
-          ? "ring"
-          : kind === "beam"
-            ? "beam"
-            : element === "ice"
-              ? "crystal"
-              : element === "earth"
-                ? "shard"
-                : "orb"
+        kind === "star" || kind === "orbit"
+          ? "star"
+          : kind === "confetti"
+            ? "shard"
+            : kind === "ring"
+              ? "ring"
+              : kind === "beam"
+                ? "beam"
+                : element === "ice"
+                  ? "crystal"
+                  : element === "earth"
+                    ? "shard"
+                    : "orb"
       ];
     mesh.material.color.setHex(COLORS[element] ?? COLORS.wind);
     mesh.material.opacity = 0.85;
     mesh.material.blending =
-      element === "earth" ? THREE.NormalBlending : THREE.AdditiveBlending;
+      element === "earth" ||
+      kind === "star" ||
+      kind === "orbit" ||
+      kind === "confetti"
+        ? THREE.NormalBlending
+        : THREE.AdditiveBlending;
     mesh.position.set(0, 0, 0);
     mesh.rotation.set(0, 0, 0);
     mesh.scale.setScalar(size);
@@ -162,15 +203,84 @@ export function createBattleEffects({
     particle.mesh.position.copy(position);
     particle.mesh.rotation.x = Math.PI / 2;
   }
+  function cartoonStar(position, element, ultimate = false) {
+    const particle = acquire(
+      "star",
+      element,
+      ultimate ? 0.23 : 0.14,
+      reducedMotion ? 0.65 : 0.95,
+    );
+    if (!particle) return;
+    particle.mesh.position.copy(position);
+    particle.mesh.rotation.y = particle.phase;
+    particle.mesh.material.color.setHex(
+      Math.random() > 0.4 ? 0xffe34c : 0xff70c9,
+    );
+    const speed = reducedMotion ? 0.35 : ultimate ? 2.8 : 1.8;
+    particle.velocity.set(
+      Math.cos(particle.phase) * speed,
+      reducedMotion ? 0.35 : 0.8 + Math.random() * 1.2,
+      Math.sin(particle.phase) * speed,
+    );
+  }
+  function dizzyStars(index) {
+    const target = catAt(index);
+    if (!target) return;
+    for (let i = 0; i < (reducedMotion ? 2 : 5); i++) {
+      const particle = acquire(
+        "orbit",
+        "lightning",
+        reducedMotion ? 0.14 : 0.2,
+        3.6,
+      );
+      if (!particle) break;
+      particle.target = indexOf(index);
+      particle.phase = (i * Math.PI * 2) / (reducedMotion ? 2 : 5);
+      particle.mesh.material.color.setHex(i % 2 ? 0xff95d5 : 0xffe34c);
+      particle.mesh.position.copy(target.root.position);
+      particle.mesh.position.y += 1.05;
+    }
+  }
+  function celebrate(index) {
+    const winner = catAt(index);
+    if (!winner) return;
+    origin.copy(winner.root.position);
+    origin.y += 0.9;
+    const palette = [
+      0xffe34c, 0xff70c9, 0x69dfff, 0x9aff78, 0xbe9aff, 0xff9b42,
+    ];
+    for (let i = 0; i < (reducedMotion ? 9 : 38); i++) {
+      const particle = acquire(
+        i % 4 === 0 ? "star" : "confetti",
+        "wind",
+        i % 4 === 0 ? 0.16 : 0.11,
+        2 + Math.random() * 1.5,
+      );
+      if (!particle) break;
+      particle.mesh.position.copy(origin);
+      particle.mesh.material.color.setHex(palette[i % palette.length]);
+      const speed = reducedMotion ? 0.35 : 1.5 + Math.random() * 1.6;
+      particle.velocity.set(
+        Math.cos(particle.phase) * speed,
+        reducedMotion ? 0.6 : 2.4 + Math.random() * 2.3,
+        Math.sin(particle.phase) * speed,
+      );
+      if (particle.kind === "confetti")
+        particle.mesh.scale.set(0.065, 0.14, 0.025);
+    }
+    ring(origin, "lightning", reducedMotion ? 0.6 : 1.1, 1.4);
+  }
   function burst(position, element, ultimate = false) {
-    const count = reducedMotion ? (ultimate ? 4 : 2) : ultimate ? 13 : 6;
+    const count = reducedMotion ? (ultimate ? 3 : 2) : ultimate ? 10 : 5;
     for (let i = 0; i < count; i++)
       spark(position, element, ultimate ? 1.4 : 1, reducedMotion);
-    ring(position, element, ultimate ? 0.48 : 0.22, ultimate ? 0.85 : 0.5);
+    for (let i = 0; i < (reducedMotion ? 1 : ultimate ? 7 : 3); i++)
+      cartoonStar(position, element, ultimate);
+    ring(position, element, ultimate ? 0.85 : 0.32, ultimate ? 0.95 : 0.55);
     if (ultimate && !reducedMotion) {
       origin.copy(position);
       origin.y += 0.3;
-      ring(origin, element, 0.32, 1);
+      ring(origin, element, 0.58, 1.1);
     }
   }
   function lightning(start, end, ultimate) {
@@ -220,9 +330,9 @@ export function createBattleEffects({
     knocks.set(indexOf(target), {
       direction,
       age: 0,
-      life: ultimate ? 0.62 : 0.44,
-      distance: ultimate ? 1.1 : 0.58,
-      height: ultimate ? 0.5 : 0.26,
+      life: ultimate ? 0.85 : 0.62,
+      distance: ultimate ? 1.9 : 1.2,
+      height: ultimate ? 1.1 : 0.5,
     });
   }
   function impact(particle) {
@@ -236,6 +346,10 @@ export function createBattleEffects({
   }
   function play(event) {
     if (disposed || !event) return;
+    if (event.type === "round-end") {
+      celebrate(event.winner ?? event.target ?? event.index);
+      return;
+    }
     const target = catAt(event.target ?? event.index);
     if (!target) return;
     if (event.type === "down" || event.type === "revive") {
@@ -246,6 +360,7 @@ export function createBattleEffects({
         event.type === "revive" ? "wind" : "dark",
         event.type === "revive",
       );
+      if (event.type === "down") dizzyStars(event.target ?? event.index);
       return;
     }
     if (event.type === "damage") {
@@ -265,7 +380,7 @@ export function createBattleEffects({
     const particle = acquire(
       "projectile",
       element,
-      ultimate ? 0.18 : 0.105,
+      ultimate ? 0.27 : 0.14,
       element === "lightning" ? 0.16 : 0.46,
     );
     if (!particle) return;
@@ -291,7 +406,7 @@ export function createBattleEffects({
     if (ultimate) {
       origin.copy(source.root.position);
       origin.y += 0.09;
-      ring(origin, element, 0.62, 0.9);
+      ring(origin, element, 0.85, 0.9);
     }
   }
 
@@ -340,23 +455,57 @@ export function createBattleEffects({
         mesh.rotation.z += dt * (reducedMotion ? 0.2 : 1.2);
       } else if (particle.kind === "beam")
         mesh.material.opacity = (1 - t) * 0.95;
-      else {
+      else if (particle.kind === "orbit") {
+        const target = catAt(particle.target);
+        if (!target) {
+          release(particle);
+          continue;
+        }
+        const angle =
+          particle.phase + particle.age * (reducedMotion ? 0.3 : 3.8);
+        mesh.position.copy(target.root.position);
+        mesh.position.x += Math.cos(angle) * (reducedMotion ? 0.4 : 0.58);
+        mesh.position.z += Math.sin(angle) * (reducedMotion ? 0.4 : 0.58);
+        mesh.position.y +=
+          1.05 + Math.sin(angle * 2) * (reducedMotion ? 0.01 : 0.08);
+        mesh.rotation.y = -angle;
+        mesh.rotation.z = Math.sin(angle) * 0.25;
+        mesh.material.opacity = Math.min(1, (1 - t) * 4);
+      } else {
         mesh.position.addScaledVector(particle.velocity, dt);
-        particle.velocity.y -= dt * (particle.element === "earth" ? 2.1 : 0.38);
+        particle.velocity.y -=
+          dt *
+          (particle.kind === "confetti"
+            ? 2
+            : particle.kind === "star"
+              ? 1.8
+              : particle.element === "earth"
+                ? 2.1
+                : 0.38);
         mesh.material.opacity = (1 - t) * 0.75;
         mesh.scale.multiplyScalar(Math.max(0.8, 1 - dt * 0.6));
-        mesh.rotation.x += dt * 3;
-        mesh.rotation.z += dt * 2;
+        mesh.rotation.x +=
+          dt * (reducedMotion ? 0.3 : particle.kind === "confetti" ? 9 : 3);
+        mesh.rotation.z +=
+          dt * (reducedMotion ? 0.2 : particle.kind === "star" ? 7 : 2);
       }
     }
 
     for (const index of shaking)
-      if (cats[index]) cats[index].root.rotation.z = 0;
+      if (
+        cats[index] &&
+        !snapshot?.fighters?.some(
+          (fighter) => fighter.index === index && fighter.hp <= 0,
+        )
+      )
+        cats[index].root.rotation.z = 0;
     shaking.clear();
     for (const fighter of snapshot?.fighters ?? []) {
       const cat = cats[fighter.index];
       const clocks = statusClocks[fighter.index];
-      if (!cat || !clocks) continue;
+      // The scene owns the collapsed pose. Do not straighten a defeated cat or
+      // let a lingering paralysis status overwrite that pose on the next frame.
+      if (!cat || !clocks || fighter.hp <= 0) continue;
       for (const status of fighter.statuses ?? []) {
         if (status.remaining <= 0) continue;
         const type = status.type;
@@ -394,9 +543,12 @@ export function createBattleEffects({
         knocks.delete(index);
         continue;
       }
+      const previousT = Math.min(1, knock.age / knock.life);
       knock.age += dt;
       const t = Math.min(1, knock.age / knock.life);
-      const amount = (knock.distance * (1 - t) * 2 * dt) / knock.life;
+      const amount =
+        knock.distance *
+        (2 * t - t * t - (2 * previousT - previousT * previousT));
       destination
         .copy(cat.root.position)
         .addScaledVector(knock.direction, amount);

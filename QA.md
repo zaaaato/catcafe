@@ -34,7 +34,7 @@ An OfflineAudioContext run rendered each of the three soundscapes for six second
 - An old rejected audio-resume request could override a newer ON request.
 - Storage-unavailable descriptions and audio-start-failure messaging were misleading.
 
-This project has been built and checked locally. It has not been published to a public domain.
+The initial checks above were local. The project is now published at https://zaaaato.github.io/catcafe/.
 
 ## Additional interaction polish
 
@@ -68,6 +68,8 @@ A further browser pass checked the hand/brush/food pointer indicator, pointer-do
 
 ## 2026-09-07 — Secret elemental battle arena
 
+Historical manual-mode checks; superseded by the autonomous battle royale below.
+
 - The cafe logo is a hidden entrance: hover for 1.3 seconds to start its shimmer/shake, continue to 4.2 seconds to enter. Touch long-press and keyboard holding also work. Leaving, lifting, moving a touch, hiding the tab, or losing focus cancels. Reduced-motion users receive a static glow.
 - Activation uses a one-shot history-state flag followed by a same-URL reload. The entry consumes the flag before mounting the battle UI; reload/return restores the ordinary cafe. No dedicated battle path or public navigation item is generated.
 - Six elements and 24 named moves: three regular moves and one ultimate per cat. HP, energy, independent cooldowns, burn damage, freezing, paralysis, slow and knockback are isolated from cafe persistence. Down cats recover after five seconds.
@@ -75,3 +77,13 @@ A further browser pass checked the hand/brush/food pointer indicator, pointer-do
 - Unit coverage includes all 24 moves, cooldowns, invalid input, effect timing, energy, knockouts, snapshot isolation, complete reset, one-shot activation and hover/touch cancellation.
 - Real WebGL battle harness: 29 checks passed, including all moves, paralysis, continued burn, lift/push/landing, and reset. Ordinary cafe regression: 18 checks passed with battle state null.
 - Actual browser hover: charging appears, leaving cancels, sustained hover enters at the same URL, and reload exits. Battle UI checked at desktop and 390px widths; ultimate casting updates HP/energy/cooldowns and logs. No JavaScript errors observed.
+
+## 2026-09-07 — Autonomous six-cat battle royale
+
+- Replaced manual commands with six independent fighters choosing targets, moving, and using the existing 24 moves. Spectators have no battle or camera controls. The original cafe headline remains.
+- Eliminated cats roll onto their side and stay down until the next round. The last survivor wins; an eight-second intermission starts a fresh round automatically. Cartoon impact stars, knockout stars, stronger knockback, and winner confetti accompany the fight.
+- Changed the secret entrance hint to `力が欲しいか、、、`.
+- `npm run check`: all 51 unit tests and production build passed. Twelve seeded engine matches finish with every cat attacking and no mid-round revival.
+- Real WebGL royale harness: all seven checks passed across 100 simulated seconds, reaching round four. Covered six autonomous attackers, ordinary/ultimate moves, movement, sideways collapse, last-survivor finish, automatic restart, and finite positions within the room.
+- Ordinary cafe WebGL regression: all 18 assertions passed, including feeding contact, toys, elevated rests, social play, tails, and disposal.
+- Actual desktop browser: sustained logo hover enters on the same URL, normal headline remains, no command buttons exist, and HP/logs update without input. Visually inspected the spectator screen and sideways fallen cats; no JavaScript errors observed.

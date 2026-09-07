@@ -41,7 +41,7 @@ export function installBattleSecret(
     if (activated || document.hidden) return;
     chargeTimer = setTimeout(() => {
       icon.classList.add("secret-charging");
-      icon.setAttribute("data-secret-hint", "…なにか、目覚めそう。");
+      icon.setAttribute("data-secret-hint", "力が欲しいか、、、");
     }, chargeMs);
     activationTimer = setTimeout(() => {
       activated = true;

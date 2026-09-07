@@ -21,6 +21,7 @@ const cafe = createCafe(
 );
 cafe.setQuality("low");
 const engine = createBattleEngine({
+  autonomous: false,
   onEvent: (event) => {
     events.push(event);
     cafe.playBattleEvent(event);
