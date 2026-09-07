@@ -123,3 +123,11 @@ Follow-up: live entry now preserves all six cat positions and headings. Elevated
 
 - Increased wind/lightning/fire/dark/ice/earth speeds to 6/3/1.5/0.8/0.35/0.15. Battle turning responds faster for fast cats. Wind now has forty times earth's base speed.
 - Real WebGL first-0.3-second net displacement measured approximately 1.00 for wind and 0.042 for earth. All 21 live battle checks, 59 unit tests, and production build passed.
+
+## Destructible furniture
+
+- Separated eight furniture groups (two plants, sofa, two tables, two stools, cat tree) from the room batch while retaining per-item batching. Normal cafe rendering and collision footprints remain intact.
+- Projectile impacts damage nearby furniture. Ordinary hits shake props and accumulate damage; ultimates launch nearby furniture into the air, rotate it, scatter fragments, and leave persistent wreckage on its original footprint. Round reset restores exact transforms and visibility.
+- Debris uses a bounded pool of 80 pieces, including reserved permanent wreckage. Reduced-motion presentation is restrained; shared room materials and geometry are never disposed or modified by the controller.
+- All 66 unit tests and production build passed. New cases cover impact delivery/cancellation, proximity, accumulated damage, flight/landing, bounded repeated rounds, exact restoration, reduced motion, and resource ownership.
+- Real WebGL: 32 battle checks, 18 ordinary cafe checks, and 21 live handover/continuous battle checks passed. A single ultimate visibly launched five nearby furniture items approximately three units high; inspected airborne furniture and settled wreckage. Normal feeding, social play, jumps, and toys still pass.

@@ -24,6 +24,7 @@ function fixture(options = {}) {
     cats,
     allowed: options.allowed ?? ((x, z) => Math.abs(x) < 4 && Math.abs(z) < 4),
     clearPath: options.clearPath ?? (() => true),
+    onImpact: options.onImpact,
   });
   const container = scene.getObjectByName("cafe-battle-effects");
   assert(container, "the effect layer must be attached to the scene");
@@ -87,6 +88,30 @@ function finiteScene(rig) {
   for (const cat of rig.cats)
     assert(cat.root.position.toArray().every(Number.isFinite));
 }
+
+test("furniture impacts arrive once at the actual hit location and reset cancels them", () => {
+  const hits = [];
+  const rig = fixture({ onImpact: (hit) => hits.push(hit) });
+  try {
+    rig.cast(0, 3);
+    assert.equal(hits.length, 0);
+    rig.cats[1].root.position.set(2, 0, 1);
+    rig.step(0.7);
+    assert.equal(hits.length, 1);
+    assert.deepEqual(hits[0].position, { x: 2, y: 0.66, z: 1 });
+    assert.equal(hits[0].element, "fire");
+    assert.equal(hits[0].ultimate, true);
+    assert.equal(hits[0].damage, BATTLE_CATS[0].moves[3].damage);
+    rig.step(2);
+    assert.equal(hits.length, 1);
+    rig.cast(1, 3);
+    rig.effects.reset();
+    rig.step(2);
+    assert.equal(hits.length, 1);
+  } finally {
+    rig.dispose();
+  }
+});
 
 test("all 24 techniques animate with finite geometry in a bounded pool and eventually finish", () => {
   const rig = fixture();

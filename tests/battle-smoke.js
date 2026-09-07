@@ -58,5 +58,35 @@ export async function runBattleSmoke(harness) {
         (cat) => cat.hp === 100 && cat.statuses.length === 0,
       ) && Math.abs(harness.snapshot().scene.cats[0].position.z - 2) < 0.001,
   );
+  harness.reset();
+  harness.cast(0, 1, 3);
+  await harness.advance(1);
+  const furniture = harness.snapshot().scene.furniture;
+  assert(
+    "ultimate impacts destroy nearby furniture and launch it into the air",
+    furniture.destroyedCount > 0 &&
+      furniture.items.some(
+        (item) => item.state === "flying" && item.position.y > 0.3,
+      ),
+  );
+  await harness.advance(2);
+  assert(
+    "broken furniture leaves bounded debris after the flight",
+    harness
+      .snapshot()
+      .scene.furniture.items.some((item) => item.state === "destroyed") &&
+      harness.snapshot().scene.furniture.debris.active <=
+        furniture.debris.capacity,
+  );
+  harness.reset();
+  assert(
+    "round reset restores every piece of furniture",
+    harness
+      .snapshot()
+      .scene.furniture.items.every(
+        (item) =>
+          item.hp === item.maxHp && item.visible && item.state === "intact",
+      ) && harness.snapshot().scene.furniture.debris.active === 0,
+  );
   return results;
 }

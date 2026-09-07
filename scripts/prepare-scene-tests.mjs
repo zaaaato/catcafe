@@ -8,6 +8,7 @@ for (const name of [
   "tail-motion.js",
   "social.js",
   "battle-effects.js",
+  "furniture-destruction.js",
   "battle-engine.js",
 ]) {
   await copyFile(

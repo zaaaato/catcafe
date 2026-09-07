@@ -1,3 +1,4 @@
+import { createFurnitureDestruction } from "./furniture-destruction.js";
 import { createBattleEffects } from "./battle-effects.js";
 import { createSocialController } from "./social.js";
 import { animateTail } from "./tail-motion.js";
@@ -176,6 +177,12 @@ export function createCafe(canvas, catsData, callbacks = {}, options = {}) {
   }
   const room = new THREE.Group();
   scene.add(room);
+  const furnitureItems = [];
+  function registerFurniture(id, object, radius, hp) {
+    object.name = `furniture:${id}`;
+    furnitureItems.push({ id, object, radius, hp });
+    return object;
+  }
   // A miniature room, with a solid timber foundation and individually laid floorboards.
   box(room, 11.4, 0.42, 9.4, 0xb29a7b, 0, -0.27, 0, 0.12);
   box(room, 11.2, 0.08, 9.2, 0xe3c9a2, 0, -0.04, 0);
@@ -265,8 +272,8 @@ export function createCafe(canvas, catsData, callbacks = {}, options = {}) {
     }
     return g;
   }
-  plant(-4.75, 0, -3.7, 1.2);
-  plant(4.65, 0, -3.8, 1.65);
+  registerFurniture("plant-left", plant(-4.75, 0, -3.7, 1.2), 0.7, 35);
+  registerFurniture("plant-right", plant(4.65, 0, -3.8, 1.65), 0.9, 35);
   plant(-5.12, 1.25, 0.5, 0.52);
   // Rear coffee bar, with slatted oak front and an espresso station.
   box(room, 4.1, 1.45, 0.97, 0xc0a37d, 0.5, 0.75, -3.9);
@@ -342,6 +349,7 @@ export function createCafe(canvas, catsData, callbacks = {}, options = {}) {
   const sofa = new THREE.Group();
   sofa.position.set(-4.4, 0, 1.45);
   room.add(sofa);
+  registerFurniture("sofa", sofa, 1.6, 150);
   box(sofa, 1.55, 0.35, 3.05, 0xa5ad8c, 0, 0.48, 0, 0.15);
   box(sofa, 0.29, 1.03, 3.13, 0xa3ad8b, -0.66, 0.99, 0, 0.12);
   for (const z of [-1.5, 1.5])
@@ -395,20 +403,25 @@ export function createCafe(canvas, catsData, callbacks = {}, options = {}) {
     ell(g, 0.23, 1.04, 0.05, 0.1, 0.035, 0.075, 0xba8855);
     return g;
   }
-  table(-2.5, 1.3, 0.85);
-  table(2.85, 1.45, 0.95);
+  registerFurniture("table-left", table(-2.5, 1.3, 0.85), 0.65, 70);
+  registerFurniture("table-right", table(2.85, 1.45, 0.95), 0.75, 70);
   function stool(x, z) {
-    cyl(room, 0.39, 0.39, 0.14, 0xd2bb95, x, 0.59, z);
+    const g = new THREE.Group();
+    g.position.set(x, 0, z);
+    room.add(g);
+    cyl(g, 0.39, 0.39, 0.14, 0xd2bb95, 0, 0.59, 0);
     for (const dx of [-0.22, 0.22])
       for (const dz of [-0.22, 0.22])
-        cyl(room, 0.036, 0.045, 0.53, 0xa28760, x + dx, 0.26, z + dz);
+        cyl(g, 0.036, 0.045, 0.53, 0xa28760, dx, 0.26, dz);
+    return g;
   }
-  stool(3.7, 2.5);
-  stool(2.32, 0.27);
+  registerFurniture("stool-front", stool(3.7, 2.5), 0.45, 40);
+  registerFurniture("stool-back", stool(2.32, 0.27), 0.45, 40);
   // Cat tree: wrapped posts, padded perches, a cozy hideaway, dangling ball.
   const tree = new THREE.Group();
   tree.position.set(3.5, 0, -1.5);
   room.add(tree);
+  registerFurniture("cat-tree", tree, 1.05, 110);
   box(tree, 1.78, 0.13, 1.5, 0xc9bb9a, 0, 0.09, 0, 0.12);
   for (const [x, z, h] of [
     [-0.48, -0.3, 2.7],
@@ -1054,7 +1067,14 @@ export function createCafe(canvas, catsData, callbacks = {}, options = {}) {
       cat.timer = 10 + i * 2;
     }
   });
+  // Preserve each furniture transform while retaining batching within the item.
+  // Excluding these groups from the room batch keeps their materials shared.
+  for (const { object } of furnitureItems) {
+    batchMeshes(object, true);
+    room.remove(object);
+  }
   batchMeshes(room, true);
+  for (const { object } of furnitureItems) room.add(object);
   // Small drifting hearts on petting.
   const furMotes = [];
   const hearts = [];
@@ -1750,10 +1770,21 @@ export function createCafe(canvas, catsData, callbacks = {}, options = {}) {
     onEvent: (event) => callbacks.onSocial?.(event),
   });
   let battleEffects = null;
+  let furnitureDestruction = null;
   let battleMarkers = [];
   function initializeBattleEffects() {
     if (battleEffects) return;
-    battleEffects = createBattleEffects({ scene, cats, allowed, clearPath });
+    furnitureDestruction = createFurnitureDestruction({
+      scene,
+      items: furnitureItems,
+    });
+    battleEffects = createBattleEffects({
+      scene,
+      cats,
+      allowed,
+      clearPath,
+      onImpact: (impact) => furnitureDestruction.hit(impact),
+    });
     battleMarkers = [
       0xed8655, 0x8acddd, 0xa899d6, 0x8acbaa, 0xdfc55e, 0xbd9d70,
     ].map((color) => {
@@ -2662,6 +2693,7 @@ export function createCafe(canvas, catsData, callbacks = {}, options = {}) {
         cameraTransition = null;
     }
     battleEffects?.update(dt, battleSnapshot, { reducedMotion });
+    furnitureDestruction?.update(dt, { reducedMotion });
     if (battleMode)
       cats.forEach((cat) => {
         const fighter = battleSnapshot?.fighters?.[cat.index];
@@ -2805,6 +2837,7 @@ export function createCafe(canvas, catsData, callbacks = {}, options = {}) {
     resetBattle() {
       if (!battleMode) return;
       battleEffects.reset?.();
+      furnitureDestruction?.reset();
       battleSnapshot = null;
       resetBattlePositions();
     },
@@ -2967,6 +3000,7 @@ export function createCafe(canvas, catsData, callbacks = {}, options = {}) {
       return {
         mode,
         battleMode,
+        furniture: furnitureDestruction?.snapshot() ?? null,
         camera: {
           position: camera.position.toArray(),
           target: controls.target.toArray(),
@@ -3035,6 +3069,7 @@ export function createCafe(canvas, catsData, callbacks = {}, options = {}) {
       listeners.forEach((remove) => remove());
       controls.removeEventListener("start", stopTransition);
       battleEffects?.dispose();
+      furnitureDestruction?.dispose();
       controls.dispose();
       const geometries = new Set(),
         materials = new Set(),

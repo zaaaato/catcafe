@@ -30,6 +30,7 @@ export function createBattleEffects({
   cats,
   allowed = () => true,
   clearPath = () => true,
+  onImpact = () => {},
 }) {
   const container = new THREE.Group();
   container.name = "cafe-battle-effects";
@@ -553,6 +554,17 @@ export function createBattleEffects({
     if (!target) return;
     destination.copy(target.root.position);
     destination.y += 0.66;
+    onImpact({
+      position: { x: destination.x, y: destination.y, z: destination.z },
+      start: { x: particle.start.x, y: particle.start.y, z: particle.start.z },
+      direction: {
+        x: destination.x - particle.start.x,
+        z: destination.z - particle.start.z,
+      },
+      element: particle.element,
+      ultimate: particle.ultimate,
+      damage: particle.damage,
+    });
     burst(destination, particle.element, particle.ultimate);
     if (particle.impact === "knockback")
       knockback(particle.attacker, particle.target, particle.ultimate);
@@ -603,6 +615,7 @@ export function createBattleEffects({
       target: indexOf(event.target),
       attacker: indexOf(event.attacker),
       ultimate,
+      damage: Number.isFinite(event.damage) ? event.damage : move.damage || 0,
       impact: event.effect ?? move.effect,
     });
     if (element === "lightning" && !ultimate)
