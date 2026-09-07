@@ -1,3 +1,4 @@
+import { createSocialController } from "./social.js";
 import { animateTail } from "./tail-motion.js";
 import { applyFeedingPose, getFeedingDiagnostics } from "./feeding.js";
 import * as THREE from "three";
@@ -1731,6 +1732,11 @@ export function createCafe(canvas, catsData, callbacks = {}) {
     }
     return null;
   }
+  const social = createSocialController(cats, {
+    allowed,
+    clearPath,
+    onEvent: (event) => callbacks.onSocial?.(event),
+  });
   function animate(now) {
     if (disposed) return;
     frameId = requestAnimationFrame(animate);
@@ -1741,7 +1747,16 @@ export function createCafe(canvas, catsData, callbacks = {}) {
     const motion = reducedMotion ? 0.18 : 1;
     if (mode === "play" && !toyManual && !toyDrag)
       placeToy(Math.sin(time * 0.65) * 1.35, Math.cos(time * 0.9) * 0.75 + 0.6);
+    social.update(dt, { mode, interaction, reducedMotion });
     for (const cat of cats) {
+      const socialAction = social.get(cat);
+      if (cat.socialActive && !socialAction) {
+        cat.state = "rest";
+        cat.pose = "sit";
+        cat.timer = 2;
+        cat.route.length = 0;
+      }
+      cat.socialActive = Boolean(socialAction);
       cat.timer -= dt;
       cat.poseTime += dt;
       cat.nextJump -= dt;
@@ -1752,6 +1767,7 @@ export function createCafe(canvas, catsData, callbacks = {}) {
       const pos = cat.root.position;
       if (
         !cat.jump &&
+        !socialAction &&
         mode === "relax" &&
         interaction?.index !== cat.index &&
         cat.pet === 0 &&
@@ -1776,6 +1792,11 @@ export function createCafe(canvas, catsData, callbacks = {}) {
             Math.cos(desired - cat.root.rotation.y),
           ) *
           (1 - Math.exp(-dt * 2.8));
+      } else if (socialAction) {
+        cat.target.set(socialAction.target.x, -0.015, socialAction.target.z);
+        cat.state = socialAction.moving ? "walk" : "rest";
+        cat.pose = "stand";
+        cat.timer = 2;
       } else if (mode === "play") {
         cat.huntTime -= dt;
         const toToy = Math.hypot(
@@ -1823,7 +1844,7 @@ export function createCafe(canvas, catsData, callbacks = {}) {
             : "walk";
         cat.pose = "stand";
       } else if (mode === "treat") {
-        const a = (cat.index * Math.PI) / 3;
+        const a = ((cat.treatSeat ?? cat.index) * Math.PI) / 3;
         cat.target.set(Math.sin(a) * 0.96, -0.015, 1 + Math.cos(a) * 0.96);
         cat.state = cat.target.distanceTo(pos) < 0.16 ? "eat" : "walk";
       } else if (cat.timer < 0) {
@@ -1876,11 +1897,13 @@ export function createCafe(canvas, catsData, callbacks = {}) {
           !interacting &&
           !yielding;
       const speed =
-        (pouncing
-          ? 2.25
-          : mode === "play"
-            ? 0.47 + cat.index * 0.027
-            : 0.3 + cat.index * 0.018) * (reducedMotion ? 0.38 : 1);
+        (socialAction?.moving
+          ? socialAction.speed
+          : pouncing
+            ? 2.25
+            : mode === "play"
+              ? 0.47 + cat.index * 0.027
+              : 0.3 + cat.index * 0.018) * (reducedMotion ? 0.38 : 1);
       if (yielding) {
         const step = Math.min(0.4 * dt * (reducedMotion ? 0.5 : 1), 0.025);
         const nx = pos.x + yielding.x * step,
@@ -1949,11 +1972,26 @@ export function createCafe(canvas, catsData, callbacks = {}) {
             pos.z = nz;
           } else cat.routeTimer = 0;
         }
-      } else if (cat.state === "walk" && mode === "relax" && cat.pet === 0) {
+      } else if (
+        cat.state === "walk" &&
+        mode === "relax" &&
+        cat.pet === 0 &&
+        !socialAction
+      ) {
         cat.state = "rest";
         cat.pose = ["sit", "stand", "groom"][cat.index % 3];
         cat.poseTime = 0;
         cat.timer = 3 + Math.random() * 5;
+      }
+      if (socialAction && !socialAction.moving && socialAction.faceTarget) {
+        const point = socialAction.faceTarget;
+        const desired = Math.atan2(point.x - pos.x, point.z - pos.z);
+        cat.root.rotation.y +=
+          Math.atan2(
+            Math.sin(desired - cat.root.rotation.y),
+            Math.cos(desired - cat.root.rotation.y),
+          ) *
+          (1 - Math.exp(-dt * 6));
       }
       if (!yielding && (cat.state === "eat" || wiggling)) {
         const point = wiggling ? toy.position : treats.position;
@@ -2138,6 +2176,15 @@ export function createCafe(canvas, catsData, callbacks = {}) {
             footZ = 0.52;
           }
         }
+        if (
+          socialAction?.phase === "pawplay" &&
+          socialAction.paw === j &&
+          front
+        ) {
+          footY = 0.43;
+          footZ = 0.65;
+          footX *= 0.55;
+        }
         leg.foot.lerp(
           new THREE.Vector3(footX, footY, footZ),
           1 - Math.exp(-dt * 12),
@@ -2194,9 +2241,11 @@ export function createCafe(canvas, catsData, callbacks = {}) {
         cat.lookAngle = (Math.random() - 0.5) * 0.52;
         cat.lookTime = 1.6 + Math.random() * 4;
       }
-      let headYaw = searching
-        ? Math.sin(time * 2.2 + cat.phase) * 0.6
-        : cat.lookAngle * still;
+      let headYaw = socialAction
+        ? 0
+        : searching
+          ? Math.sin(time * 2.2 + cat.phase) * 0.6
+          : cat.lookAngle * still;
       if (
         !interacting &&
         ((mode === "play" && !searching) || mode === "treat")
@@ -2263,6 +2312,24 @@ export function createCafe(canvas, catsData, callbacks = {}) {
         5,
         dt,
       );
+      if (socialAction) {
+        cat.head.rotation.x = THREE.MathUtils.damp(
+          cat.head.rotation.x,
+          socialAction.phase === "greet"
+            ? 0.04
+            : socialAction.phase === "pawplay"
+              ? 0.12
+              : -0.05,
+          8,
+          dt,
+        );
+        cat.head.rotation.y = THREE.MathUtils.damp(
+          cat.head.rotation.y,
+          0,
+          8,
+          dt,
+        );
+      }
       applyFeedingPose(cat, { eating, sniffing, dt, time, treats, motion });
       cat.blinkTime -= dt;
       if (cat.blinkTime < 0) {
@@ -2362,33 +2429,35 @@ export function createCafe(canvas, catsData, callbacks = {}) {
                   ? "ごろごろ… ♡"
                   : interacting
                     ? "そばで、あなたを見ている"
-                    : mode === "play"
-                      ? wiggling
-                        ? "おしり、ふりふり…"
-                        : pouncing
-                          ? "えいっ、つかまえた？"
-                          : searching
-                            ? "あれ、どこいった？"
-                            : "そーっと、狙いをさだめて"
-                      : eating
-                        ? "もぐもぐ"
-                        : mode === "treat"
-                          ? "おやつへ！"
-                          : sleeping
-                            ? "すやすや、おひるね"
-                            : grooming
-                              ? faceWipe
-                                ? "おててで、顔をくしくし"
-                                : "おててをぺろぺろ"
-                              : kneading
-                                ? "ふみふみ、ねむくなってきた"
-                                : stretching
-                                  ? "ぐーんとのびのび"
-                                  : moving
-                                    ? "気ままにおさんぽ"
-                                    : sitting
-                                      ? "おすわり、のんびり"
-                                      : "きょろきょろ",
+                    : socialAction
+                      ? socialAction.mood
+                      : mode === "play"
+                        ? wiggling
+                          ? "おしり、ふりふり…"
+                          : pouncing
+                            ? "えいっ、つかまえた？"
+                            : searching
+                              ? "あれ、どこいった？"
+                              : "そーっと、狙いをさだめて"
+                        : eating
+                          ? "もぐもぐ"
+                          : mode === "treat"
+                            ? "おやつへ！"
+                            : sleeping
+                              ? "すやすや、おひるね"
+                              : grooming
+                                ? faceWipe
+                                  ? "おててで、顔をくしくし"
+                                  : "おててをぺろぺろ"
+                                : kneading
+                                  ? "ふみふみ、ねむくなってきた"
+                                  : stretching
+                                    ? "ぐーんとのびのび"
+                                    : moving
+                                      ? "気ままにおさんぽ"
+                                      : sitting
+                                        ? "おすわり、のんびり"
+                                        : "きょろきょろ",
       );
     }
     for (let j = furMotes.length - 1; j >= 0; j--) {
@@ -2533,6 +2602,7 @@ export function createCafe(canvas, catsData, callbacks = {}) {
       if (cats[i]) pet(i);
     },
     setInteraction(kind, index = focused) {
+      social.cancel();
       releaseToy();
       if (kind === null) {
         interaction = null;
@@ -2572,12 +2642,43 @@ export function createCafe(canvas, catsData, callbacks = {}) {
     },
     setMode(value) {
       if (!["relax", "play", "treat"].includes(value) || disposed) return;
+      social.cancel();
       releaseToy();
       if (mode !== value) toyManual = false;
       mode = value;
       notifyToy();
       toy.visible = value === "play";
       treats.visible = value === "treat";
+      if (value === "treat") {
+        // Preserve circular order around the bowl so diners do not swap through
+        // one another. Choose the rotation with the shortest total approach.
+        const ordered = [...cats].sort(
+          (a, b) =>
+            Math.atan2(a.root.position.x, a.root.position.z - 1) -
+            Math.atan2(b.root.position.x, b.root.position.z - 1),
+        );
+        let best = 0,
+          cost = Infinity;
+        for (let offset = 0; offset < cats.length; offset++) {
+          const candidate = ordered.reduce((sum, cat, i) => {
+            const angle = (((i + offset) % cats.length) * Math.PI) / 3;
+            return (
+              sum +
+              Math.hypot(
+                cat.root.position.x - Math.sin(angle) * 0.96,
+                cat.root.position.z - 1 - Math.cos(angle) * 0.96,
+              )
+            );
+          }, 0);
+          if (candidate < cost) {
+            cost = candidate;
+            best = offset;
+          }
+        }
+        ordered.forEach((cat, i) => {
+          cat.treatSeat = (i + best) % cats.length;
+        });
+      }
       for (const cat of cats) {
         cat.routeTimer = 0;
         if (cat.jump) continue;
@@ -2639,6 +2740,7 @@ export function createCafe(canvas, catsData, callbacks = {}) {
     getSnapshot() {
       return {
         mode,
+        social: social.snapshot(),
         focused,
         quality,
         reducedMotion,
@@ -2673,6 +2775,8 @@ export function createCafe(canvas, catsData, callbacks = {}) {
           pose: cat.pose,
           feeding: getFeedingDiagnostics(cat),
           tailTip: cat.tailTip.position.toArray(),
+          social: social.get(cat)?.phase ?? null,
+          paws: cat.legs.map((leg) => leg.foot.toArray()),
           jump: cat.jump?.stage ?? null,
           highSpot: cat.jump?.spot.name ?? null,
           huntPhase: mode === "play" ? cat.huntPhase : null,

@@ -35,6 +35,7 @@ function create() {
     onMood: (index, mood) => record("mood", { index, mood }),
     onFocus: (index) => record("focus", { index }),
     onInteraction: (detail) => record("interaction", detail),
+    onSocial: (detail) => record("social", detail),
   });
   virtualTime = performance.now();
   instance.setQuality("low");

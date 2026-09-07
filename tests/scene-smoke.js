@@ -8,6 +8,16 @@ export async function runSceneSmoke(harness) {
   await harness.advance(100);
   const observed = harness.summarize();
   harness.assert(
+    "cats greet and play with one another",
+    [
+      "お鼻で、こんにちは",
+      "おててで、ちょいちょい",
+      "まてまて、追いかけっこ",
+    ].every((mood) => observed.moods.includes(mood)),
+    observed.moods,
+  );
+
+  harness.assert(
     "natural poses",
     ["sit", "sleep", "groom", "knead", "stretch"].every((p) =>
       observed.poses.includes(p),
@@ -20,6 +30,10 @@ export async function runSceneSmoke(harness) {
     observed.highSpots,
   );
   harness.setMode("treat");
+  harness.assert(
+    "food mode cancels social play",
+    harness.snapshot().cats.every((c) => c.social === null),
+  );
   await harness.advance(45);
   // Arrival depends on the cats' current routes and reserved high resting spots.
   // Allow a bounded settling period instead of sampling one arbitrary frame.

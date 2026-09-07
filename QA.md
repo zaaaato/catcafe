@@ -56,3 +56,12 @@ A further browser pass checked the hand/brush/food pointer indicator, pointer-do
 - `npm run check`: 25 unit tests passed, including six tail deformation regressions; production build passed.
 - Real WebGL smoke: 16 assertions passed, including six moving tails and existing food contact, jumps, hunting and interactions. Communal feeding allows a bounded settling period for different starting routes.
 - Compared close-up frames of a seated, petted cat: the tail visibly bends sideways while its height stays unchanged. No browser errors.
+
+## 2026-09-07 — Cat-to-cat play
+
+- Added one voluntary social pair at a time in relax mode: approach, nose greeting, alternating paw invitations, then a short chase along checked paths. Sleep, jumps and direct care exclude participants; modes and user care cancel immediately. Recent pairs have a small priority penalty.
+- Integrated facing, planted-foot IK and raised alternating paws with existing movement. The controller never teleports roots and chase followers keep their distance.
+- The observation notebook now discovers three social gestures, with a dynamic total of ten and updated help.
+- Fixed an exposed dining deadlock: assign bowl seats in current angular order, choosing the shortest rotation, so cats do not exchange places through one another after play.
+- `npm run check`: 32 unit tests and production build passed. Seven social unit cases cover phase progression, actual movement stopping radius, scale-aware nose spacing, exclusions, cancellation, timeouts, unsafe paths and pair rotation.
+- Real WebGL regression: 18 assertions passed. Visually inspected the greeting/paw pair; both cats moved during chase (approximately 0.77 and 1.01 scene units over 1.5 seconds). Direct care immediately cancelled social play. Existing food contact, toy control, tails, jumps and capture remained functional.
