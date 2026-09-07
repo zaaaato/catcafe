@@ -25,6 +25,12 @@ export async function runSceneSmoke(harness) {
     "all cats safely descend and reach food",
     harness.snapshot().cats.every((c) => c.state === "eat" && c.jump === null),
   );
+  harness.assert(
+    "mouth touches communal food",
+    harness
+      .snapshot()
+      .cats.every((c) => c.feeding.active && c.feeding.contactDistance < 0.02),
+  );
   harness.setMode("play");
   await harness.advance(25);
   const moods = harness.summarize().moods;
@@ -33,6 +39,21 @@ export async function runSceneSmoke(harness) {
     ["おしり、ふりふり…", "えいっ、つかまえた？", "あれ、どこいった？"].every(
       (m) => moods.includes(m),
     ),
+  );
+  const ball = harness.snapshot().toy;
+  harness.assert(
+    "rolling ball stays above rug",
+    ball.position[1] - ball.radius >= ball.floorY,
+  );
+  harness.moveToy(100, -100);
+  const moved = harness.snapshot().toy;
+  await harness.advance(1);
+  harness.assert(
+    "manual toy stays put inside play area",
+    moved.manual &&
+      Math.abs(moved.position[0]) < 1.8 &&
+      Math.abs(moved.position[2]) < 2.1 &&
+      harness.snapshot().toy.position.every((n, i) => n === moved.position[i]),
   );
   harness.setInteraction("brush", 0);
   await harness.advance(2);
@@ -54,6 +75,11 @@ export async function runSceneSmoke(harness) {
   harness.assert(
     "eat after sniffing",
     harness.snapshot().cats[0].mood.includes("もぐもぐ"),
+  );
+  await harness.advance(0.7);
+  harness.assert(
+    "mouth touches individual snack",
+    harness.snapshot().cats[0].feeding.contactDistance < 0.02,
   );
   harness.setReducedMotion(true);
   harness.setQuality("high");

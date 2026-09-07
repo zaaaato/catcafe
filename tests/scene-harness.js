@@ -87,6 +87,7 @@ window.cafeHarness = {
     samples: snapshots.length,
     snapshot: instance.getSnapshot(),
   }),
+  moveToy: (dx, dz) => instance.moveToy(dx, dz),
   setMode: (value) => instance.setMode(value),
   setInteraction: (kind, index) => instance.setInteraction(kind, index),
   performInteraction: () => instance.performInteraction(),

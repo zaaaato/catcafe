@@ -2790,3 +2790,83 @@ button.icon-button:focus-visible {
 .reduce-motion .interaction-cursor {
   display: none !important;
 }
+
+/* A quiet guide stays clear of the ball and never captures a drag. */
+.toy-guide {
+  position: absolute;
+  top: 68px;
+  left: 22px;
+  max-width: calc(100% - 94px);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 15px;
+  background: #fffdf2ed;
+  border: 1px solid #ffffffb8;
+  border-radius: 10px;
+  color: #667450;
+  pointer-events: none;
+  box-shadow: 0 3px 16px #52613b0b;
+}
+.toy-guide-icon {
+  display: grid;
+  place-items: center;
+  width: 29px;
+  height: 29px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: #edf0df;
+}
+.toy-guide-icon svg {
+  width: 16px;
+  height: 16px;
+}
+.toy-guide strong {
+  display: block;
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1.7;
+}
+.toy-guide small {
+  display: block;
+  font-size: 8px;
+  line-height: 1.8;
+  color: #707c60;
+  margin-top: 3px;
+}
+.toy-guide.is-dragging .toy-guide-icon {
+  background: #dce6c9;
+  color: #536d38;
+}
+.is-playing .welcome-tip {
+  display: none !important;
+}
+@media (max-width: 540px) {
+  .toy-guide {
+    top: 61px;
+    left: 13px;
+    padding: 10px 12px;
+    max-width: calc(100% - 76px);
+    gap: 8px;
+  }
+  .toy-guide-icon {
+    width: 25px;
+    height: 25px;
+  }
+  .toy-guide-icon svg {
+    width: 14px;
+    height: 14px;
+  }
+  .toy-guide strong {
+    font-size: 9px;
+  }
+  .toy-guide small {
+    font-size: 7px;
+  }
+  .toy-keyboard-hint {
+    display: none;
+  }
+  .toy-guide .toy-pointer-hint:after {
+    content: " · 猫の前で、ゆっくり";
+  }
+}

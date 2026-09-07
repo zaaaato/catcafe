@@ -1,3 +1,4 @@
+import { applyFeedingPose, getFeedingDiagnostics } from "./feeding.js";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
@@ -1198,11 +1199,13 @@ export function createCafe(canvas, catsData, callbacks = {}) {
       ? pickInfo(event)
         ? "pointer"
         : "crosshair"
-      : event.buttons
-        ? "grabbing"
-        : pickInfo(event)
-          ? "pointer"
-          : "grab";
+      : hitsToy(event)
+        ? "grab"
+        : event.buttons
+          ? "grabbing"
+          : pickInfo(event)
+            ? "pointer"
+            : "grab";
     if (down && interaction && interaction.kind !== "feed") interact(event);
   });
   listen(canvas, "pointerup", (event) => {
@@ -1232,17 +1235,121 @@ export function createCafe(canvas, catsData, callbacks = {}) {
   });
   const toy = new THREE.Group();
   scene.add(toy);
-  ell(toy, 0, 0.14, 0, 0.14, 0.14, 0.14, 0xb79576);
+  ell(toy, 0, 0, 0, 0.14, 0.14, 0.14, 0xb79576);
   const stripe = mesh(
     new THREE.TorusGeometry(0.141, 0.01, 8, 24),
     0xf1ddbc,
     toy,
     0,
-    0.14,
+    0,
     0,
   );
   stripe.rotation.x = 0.5;
   toy.visible = false;
+  toy.position.set(0, 0.2055, 1.35);
+  let toyDrag = null,
+    toyManual = false;
+  const toyPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -0.2055);
+  function toyRay(event) {
+    const rect = canvas.getBoundingClientRect();
+    pointer.set(
+      ((event.clientX - rect.left) / rect.width) * 2 - 1,
+      (-(event.clientY - rect.top) / rect.height) * 2 + 1,
+    );
+    raycaster.setFromCamera(pointer, camera);
+  }
+  function hitsToy(event) {
+    if (!toy.visible || interaction) return false;
+    toyRay(event);
+    const sphere = new THREE.Sphere(toy.position, 0.25);
+    const hit = raycaster.ray.intersectSphere(sphere, new THREE.Vector3());
+    if (!hit) return false;
+    const blocker = raycaster
+      .intersectObject(room, true)
+      .find((item) => !item.object.material?.transparent);
+    return !blocker || blocker.distance > hit.distanceTo(raycaster.ray.origin);
+  }
+  function placeToy(x, z) {
+    // Keep the ball on the open rug, away from furniture and room edges.
+    x = THREE.MathUtils.clamp(x, -1.65, 1.65);
+    z = THREE.MathUtils.clamp(z, -0.55, 2.05);
+    const edge = Math.hypot((x - 0.1) / 1.65, (z - 0.75) / 1.2);
+    if (edge > 1) {
+      x = 0.1 + (x - 0.1) / edge;
+      z = 0.75 + (z - 0.75) / edge;
+    }
+    const dx = x - toy.position.x,
+      dz = z - toy.position.z;
+    const distance = Math.hypot(dx, dz);
+    if (distance > 0)
+      toy.quaternion.premultiply(
+        new THREE.Quaternion().setFromAxisAngle(
+          new THREE.Vector3(dz, 0, -dx).normalize(),
+          distance / 0.151,
+        ),
+      );
+    toy.position.set(x, 0.2055, z);
+  }
+  function notifyToy() {
+    callbacks.onToyChange?.({ dragging: Boolean(toyDrag), manual: toyManual });
+  }
+  function releaseToy() {
+    if (!toyDrag) return;
+    const id = toyDrag.id;
+    toyDrag = null;
+    if (canvas.hasPointerCapture(id)) canvas.releasePointerCapture(id);
+    controls.enabled = true;
+    canvas.style.cursor = interaction ? "crosshair" : "grab";
+    notifyToy();
+  }
+  listen(
+    canvas,
+    "pointerdown",
+    (event) => {
+      if (!event.isPrimary || event.button !== 0 || !hitsToy(event)) return;
+      event.stopImmediatePropagation();
+      event.preventDefault();
+      const point = raycaster.ray.intersectPlane(toyPlane, new THREE.Vector3());
+      if (!point) return;
+      toyDrag = {
+        id: event.pointerId,
+        offset: toy.position.clone().sub(point),
+      };
+      toyManual = true;
+      down = null;
+      controls.enabled = false;
+      canvas.setPointerCapture(event.pointerId);
+      canvas.focus({ preventScroll: true });
+      canvas.style.cursor = "grabbing";
+      notifyToy();
+    },
+    { capture: true },
+  );
+  listen(
+    canvas,
+    "pointermove",
+    (event) => {
+      if (!toyDrag || event.pointerId !== toyDrag.id) return;
+      event.stopImmediatePropagation();
+      toyRay(event);
+      const point = raycaster.ray.intersectPlane(toyPlane, new THREE.Vector3());
+      if (point)
+        placeToy(point.x + toyDrag.offset.x, point.z + toyDrag.offset.z);
+    },
+    { capture: true },
+  );
+  for (const type of ["pointerup", "pointercancel", "lostpointercapture"])
+    listen(
+      canvas,
+      type,
+      (event) => {
+        if (!toyDrag || event.pointerId !== toyDrag.id) return;
+        event.stopImmediatePropagation();
+        releaseToy();
+      },
+      { capture: true },
+    );
+  listen(window, "blur", releaseToy);
   const treats = new THREE.Group();
   scene.add(treats);
   cyl(treats, 0.43, 0.38, 0.065, 0xd2a680, 0, 0.085, 0);
@@ -1631,22 +1738,15 @@ export function createCafe(canvas, catsData, callbacks = {}) {
     last = now;
     time += dt;
     const motion = reducedMotion ? 0.18 : 1;
-    if (mode === "play") {
-      toy.position.set(
-        Math.sin(time * 0.65) * 1.35,
-        0.02 + Math.abs(Math.sin(time * 4)) * 0.045 * motion,
-        Math.cos(time * 0.9) * 0.75 + 0.6,
-      );
-      toy.rotation.z = time * 2 * motion;
-      toy.rotation.x = time * motion;
-    }
+    if (mode === "play" && !toyManual && !toyDrag)
+      placeToy(Math.sin(time * 0.65) * 1.35, Math.cos(time * 0.9) * 0.75 + 0.6);
     for (const cat of cats) {
       cat.timer -= dt;
       cat.poseTime += dt;
       cat.nextJump -= dt;
       cat.feedTime = Math.max(0, cat.feedTime - dt);
       cat.brushTime = Math.max(0, cat.brushTime - dt);
-      cat.snack.visible = cat.feedTime > 0.5;
+      cat.snack.visible = cat.feedTime > 0.05;
       cat.pet = Math.max(0, cat.pet - dt);
       const pos = cat.root.position;
       if (
@@ -1933,7 +2033,7 @@ export function createCafe(canvas, catsData, callbacks = {}) {
                     : kneading
                       ? -0.12
                       : eating
-                        ? -0.05
+                        ? -0.19
                         : 0) +
           Math.sin(gait * 2) * 0.009 * cat.velocity +
           breathe,
@@ -1950,9 +2050,11 @@ export function createCafe(canvas, catsData, callbacks = {}) {
             ? -0.23
             : stretching
               ? 0.29
-              : wiggling
-                ? 0.08
-                : 0,
+              : eating
+                ? 0.18
+                : wiggling
+                  ? 0.08
+                  : 0,
         5,
         dt,
       );
@@ -2160,6 +2262,7 @@ export function createCafe(canvas, catsData, callbacks = {}) {
         5,
         dt,
       );
+      applyFeedingPose(cat, { eating, sniffing, dt, time, treats, motion });
       cat.blinkTime -= dt;
       if (cat.blinkTime < 0) {
         cat.blinkRemaining = 0.16;
@@ -2403,6 +2506,7 @@ export function createCafe(canvas, catsData, callbacks = {}) {
     return best;
   }
   function reset() {
+    releaseToy();
     interaction = null;
     controls.enableRotate = true;
     focused = -1;
@@ -2417,6 +2521,7 @@ export function createCafe(canvas, catsData, callbacks = {}) {
       if (cats[i]) pet(i);
     },
     setInteraction(kind, index = focused) {
+      releaseToy();
       if (kind === null) {
         interaction = null;
         controls.enableRotate = true;
@@ -2440,9 +2545,25 @@ export function createCafe(canvas, catsData, callbacks = {}) {
     performInteraction() {
       interact(null);
     },
+    moveToy(dx, dz) {
+      if (
+        disposed ||
+        mode !== "play" ||
+        interaction ||
+        !Number.isFinite(dx) ||
+        !Number.isFinite(dz)
+      )
+        return;
+      toyManual = true;
+      placeToy(toy.position.x + dx, toy.position.z + dz);
+      notifyToy();
+    },
     setMode(value) {
       if (!["relax", "play", "treat"].includes(value) || disposed) return;
+      releaseToy();
+      if (mode !== value) toyManual = false;
       mode = value;
+      notifyToy();
       toy.visible = value === "play";
       treats.visible = value === "treat";
       for (const cat of cats) {
@@ -2511,6 +2632,22 @@ export function createCafe(canvas, catsData, callbacks = {}) {
         reducedMotion,
         evening,
         interaction: interaction ? { ...interaction } : null,
+        toy: {
+          visible: toy.visible,
+          dragging: Boolean(toyDrag),
+          manual: toyManual,
+          position: toy.position.toArray(),
+          radius: 0.151,
+          floorY: 0.0525,
+          screen: (() => {
+            const p = toy.position.clone().project(camera);
+            const r = canvas.getBoundingClientRect();
+            return {
+              x: r.left + ((p.x + 1) * r.width) / 2,
+              y: r.top + ((1 - p.y) * r.height) / 2,
+            };
+          })(),
+        },
         diagnostics: {
           drawCalls: renderer.info.render.calls,
           triangles: renderer.info.render.triangles,
@@ -2522,6 +2659,7 @@ export function createCafe(canvas, catsData, callbacks = {}) {
           mood: cat.mood,
           state: cat.state,
           pose: cat.pose,
+          feeding: getFeedingDiagnostics(cat),
           jump: cat.jump?.stage ?? null,
           highSpot: cat.jump?.spot.name ?? null,
           huntPhase: mode === "play" ? cat.huntPhase : null,

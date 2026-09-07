@@ -39,3 +39,12 @@ This project has been built and checked locally. It has not been published to a 
 ## Additional interaction polish
 
 A further browser pass checked the hand/brush/food pointer indicator, pointer-down feedback, hiding on leave/cancel, and disabling the indicator with reduced motion. The interaction camera foreground now makes nearby cats walk gently to the side without moving the selected cat or interrupting airborne jumps. An observed case moved Goma aside while Chai stayed fixed; all six cats subsequently reached food after interaction ended. The full real-WebGL smoke sequence (179.9 simulated seconds) passed all 11 assertions again.
+
+## 2026-09-07 — Toy handling and feeding contact
+
+- Centered the rolling ball geometry on its rotation origin and placed its full radius above the rug. Manual movement stays within the clear play area.
+- Added pointer capture for ball dragging, camera suspension during dragging, release/cancel/blur cleanup, arrow-key movement, and contextual PC/mobile instructions.
+- Feeding now tracks an actual food mesh with the mouth landmark, lowers the shoulders with planted-foot IK, sniffs before eating, and smoothly restores the head afterward.
+- `npm run check`: 19 unit tests and production build passed.
+- Real WebGL deterministic smoke: 15 assertions passed, including all six cats reaching communal food, mouth contact with communal and individual snacks, ball clearance, manual position persistence, hunting, elevated rests, brushing, quality settings, capture, and disposal.
+- Visually inspected communal feeding and a close-up of individual feeding. Settled mouth-to-food distance was approximately 0.002–0.005 scene units.
