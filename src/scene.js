@@ -1,3 +1,4 @@
+import { animateTail } from "./tail-motion.js";
 import { applyFeedingPose, getFeedingDiagnostics } from "./feeding.js";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
@@ -2308,8 +2309,9 @@ export function createCafe(canvas, catsData, callbacks = {}) {
         .addScaledVector(cat.tailTips[2], sleepWeight);
       cat.tail.rotation.z =
         (wiggling
-          ? Math.sin(time * 19) * 0.12
-          : Math.sin(time * 1.5 + cat.phase) * (moving ? 0.17 : 0.11)) *
+          ? Math.sin(time * 19 + cat.phase) * 0.16
+          : Math.sin(time * (1.35 + cat.index * 0.055) + cat.phase) *
+            (moving ? 0.25 : 0.16)) *
         motion *
         upright;
       cat.tail.rotation.x = THREE.MathUtils.damp(
@@ -2320,6 +2322,16 @@ export function createCafe(canvas, catsData, callbacks = {}) {
         4,
         dt,
       );
+      animateTail(cat, {
+        time,
+        dt,
+        moving,
+        sitting,
+        sleeping,
+        wiggling,
+        eating,
+        motion,
+      });
       mood(
         cat,
         yielding
@@ -2660,6 +2672,7 @@ export function createCafe(canvas, catsData, callbacks = {}) {
           state: cat.state,
           pose: cat.pose,
           feeding: getFeedingDiagnostics(cat),
+          tailTip: cat.tailTip.position.toArray(),
           jump: cat.jump?.stage ?? null,
           highSpot: cat.jump?.spot.name ?? null,
           huntPhase: mode === "play" ? cat.huntPhase : null,

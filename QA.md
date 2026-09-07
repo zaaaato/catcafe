@@ -48,3 +48,11 @@ A further browser pass checked the hand/brush/food pointer indicator, pointer-do
 - `npm run check`: 19 unit tests and production build passed.
 - Real WebGL deterministic smoke: 15 assertions passed, including all six cats reaching communal food, mouth contact with communal and individual snacks, ball clearance, manual position persistence, hunting, elevated rests, brushing, quality settings, capture, and disposal.
 - Visually inspected communal feeding and a close-up of individual feeding. Settled mouth-to-food distance was approximately 0.002–0.005 scene units.
+
+## 2026-09-07 — Expressive tails
+
+- Added continuous tail bending with delayed motion toward the tip and intermittent tip flicks. Sitting, sleeping, walking, affection and hunting use different amplitudes; phase integration keeps transitions smooth even after long sessions.
+- CPU pose blending avoids stale GPU morph textures and keeps the root attached, tip aligned, normals normalized, and deformations noncumulative. Existing geometry/materials are reused.
+- `npm run check`: 25 unit tests passed, including six tail deformation regressions; production build passed.
+- Real WebGL smoke: 16 assertions passed, including six moving tails and existing food contact, jumps, hunting and interactions. Communal feeding allows a bounded settling period for different starting routes.
+- Compared close-up frames of a seated, petted cat: the tail visibly bends sideways while its height stays unchanged. No browser errors.

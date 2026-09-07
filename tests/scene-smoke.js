@@ -21,6 +21,23 @@ export async function runSceneSmoke(harness) {
   );
   harness.setMode("treat");
   await harness.advance(45);
+  // Arrival depends on the cats' current routes and reserved high resting spots.
+  // Allow a bounded settling period instead of sampling one arbitrary frame.
+  for (
+    let attempt = 0;
+    attempt < 15 &&
+    harness
+      .snapshot()
+      .cats.some(
+        (c) =>
+          c.state !== "eat" ||
+          c.jump !== null ||
+          !c.feeding.active ||
+          c.feeding.contactDistance >= 0.02,
+      );
+    attempt++
+  )
+    await harness.advance(3);
   harness.assert(
     "all cats safely descend and reach food",
     harness.snapshot().cats.every((c) => c.state === "eat" && c.jump === null),
@@ -97,5 +114,17 @@ export async function runSceneSmoke(harness) {
   harness.setInteraction(null);
   harness.recreate();
   await harness.advance(2);
+  const initialTails = harness.snapshot().cats.map((c) => c.tailTip);
+  await harness.advance(0.7);
+  harness.assert(
+    "all six tails flex independently",
+    harness
+      .snapshot()
+      .cats.every(
+        (c, i) =>
+          c.tailTip.every(Number.isFinite) &&
+          Math.abs(c.tailTip[0] - initialTails[i][0]) > 0.00001,
+      ),
+  );
   return harness.report();
 }
