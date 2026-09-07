@@ -131,6 +131,14 @@ async function runSmoke() {
   startBattle();
   const entered = cafe.getSnapshot();
   check(
+    "handover preserves every cat's current position",
+    before.cats.every((cat, index) =>
+      Object.keys(cat.position).every(
+        (axis) => cat.position[axis] === entered.cats[index].position[axis],
+      ),
+    ),
+  );
+  check(
     "handover reuses the exact canvas and WebGL context",
     document.querySelector("#cafe") === canvas &&
       canvas.getContext("webgl2") === originalContext &&

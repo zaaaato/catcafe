@@ -108,6 +108,8 @@ Historical manual-mode checks; superseded by the autonomous battle royale below.
 
 ## 2026-09-07 — Live transition and spectator camera controls
 
+Follow-up: live entry now preserves all six cat positions and headings. Elevated cats retain their jump and descend naturally. All 21 live WebGL checks passed, including exact before/after position equality; a separate elevated-cat run retained its position and completed descent. All 58 unit tests and the production build passed. Round restart formations remain unchanged.
+
 - Secret activation loads its UI while the cafe keeps rendering, then transfers the existing scene and DOM into battle. No document reload, canvas replacement, whiteout, or loading overlay occurs. Old cafe UI listeners, timers, subscriptions, and audio are released before battle attaches its handlers.
 - Added an idempotent scene handover that clears play, feeding, interaction, social behavior, and jumps while retaining the renderer, canvas, WebGL context, camera position, and target. Automatic round resets preserve the visitor's camera.
 - Restored orbit dragging, zoom, view reset, fullscreen, photo capture, and day/evening controls in battle. Cat interaction buttons remain disabled. Keyboard +/-/R/F/C and photo dialog controls work alongside the scene buttons.

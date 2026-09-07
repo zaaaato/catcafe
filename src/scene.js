@@ -1595,6 +1595,7 @@ export function createCafe(canvas, catsData, callbacks = {}, options = {}) {
       cat.state = "walk";
       cat.pose = "stand";
       if (
+        battleMode ||
         mode !== "relax" ||
         interaction?.index === cat.index ||
         jump.time > 30
@@ -1653,6 +1654,7 @@ export function createCafe(canvas, catsData, callbacks = {}, options = {}) {
       cat.state = "rest";
       if (cat.pose === "knead" && jump.time > 5) cat.pose = "sleep";
       if (
+        battleMode ||
         mode !== "relax" ||
         interaction?.index === cat.index ||
         jump.time > jump.duration
@@ -1752,41 +1754,44 @@ export function createCafe(canvas, catsData, callbacks = {}, options = {}) {
   function initializeBattleEffects() {
     if (battleEffects) return;
     battleEffects = createBattleEffects({ scene, cats, allowed, clearPath });
-    battleMarkers = [0xed8655, 0x8acddd, 0xa899d6, 0x8acbaa, 0xdfc55e, 0xbd9d70].map(
-      (color) => {
-        const marker = new THREE.Mesh(
-          new THREE.RingGeometry(0.44, 0.48, 48),
-          new THREE.MeshBasicMaterial({
-            color,
-            side: THREE.DoubleSide,
-            transparent: true,
-            opacity: 0.85,
-            depthWrite: false,
-          }),
-        );
-        marker.rotation.x = -Math.PI / 2;
-        marker.visible = false;
-        scene.add(marker);
-        return marker;
-      },
-    );
+    battleMarkers = [
+      0xed8655, 0x8acddd, 0xa899d6, 0x8acbaa, 0xdfc55e, 0xbd9d70,
+    ].map((color) => {
+      const marker = new THREE.Mesh(
+        new THREE.RingGeometry(0.44, 0.48, 48),
+        new THREE.MeshBasicMaterial({
+          color,
+          side: THREE.DoubleSide,
+          transparent: true,
+          opacity: 0.85,
+          depthWrite: false,
+        }),
+      );
+      marker.rotation.x = -Math.PI / 2;
+      marker.visible = false;
+      scene.add(marker);
+      return marker;
+    });
   }
-  function resetBattlePositions() {
+  function resetBattlePositions(preservePositions = false) {
     if (!battleMode) return;
     perches.forEach((spot) => {
       spot.owner = -1;
     });
     cats.forEach((cat, i) => {
       const angle = (i * Math.PI) / 3;
-      cat.root.position.set(
-        Math.sin(angle) * 1.55,
-        -0.015,
-        0.75 + Math.cos(angle) * 1.25,
-      );
-      cat.root.rotation.set(0, angle + Math.PI, 0);
+      if (!preservePositions) {
+        cat.root.position.set(
+          Math.sin(angle) * 1.55,
+          -0.015,
+          0.75 + Math.cos(angle) * 1.25,
+        );
+        cat.root.rotation.set(0, angle + Math.PI, 0);
+      }
       cat.state = "rest";
       cat.pose = "stand";
-      cat.jump = null;
+      // Keep an elevated cat's current jump so it can descend naturally.
+      if (!preservePositions) cat.jump = null;
       cat.route.length = 0;
       cat.velocity = 0;
       cat.pet = 0;
@@ -1824,7 +1829,7 @@ export function createCafe(canvas, catsData, callbacks = {}, options = {}) {
     battleMode = true;
     battleSnapshot = null;
     initializeBattleEffects();
-    resetBattlePositions();
+    resetBattlePositions(options.battle !== true);
     controls.enabled = true;
     controls.enableRotate = true;
     controls.enableZoom = true;
